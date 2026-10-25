@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="refresh" content="300">
+<meta name="theme-color" content="#070b14">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trading News">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Trading News</title>
+<style>
+:root{
+  --bg:#f3f5fb;--bg2:#e9edf8;--card:#ffffff;--card2:#f7f8fd;--tx:#0f172a;--mut:#64748b;--bd:#e3e7f1;
+  --ac:#4f6ef7;--ac2:#8b5cf6;--up:#16a34a;--dn:#e11d48;--warn:#f59e0b;--glass:rgba(255,255,255,.78);
+  --sh:0 1px 2px rgba(15,23,42,.05),0 8px 24px -12px rgba(15,23,42,.12);
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#070b14;--bg2:#0d1424;--card:#101828;--card2:#0c1322;--tx:#e8edf8;--mut:#8593ad;--bd:#1b2740;
+  --ac:#7c9cff;--ac2:#a78bfa;--up:#34d399;--dn:#fb7185;--warn:#fbbf24;--glass:rgba(13,20,36,.78);
+  --sh:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6);
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--tx);font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Inter,sans-serif;
+  background:radial-gradient(900px 420px at 85% -120px,color-mix(in srgb,var(--ac) 22%,transparent),transparent 70%),
+             radial-gradient(700px 360px at -10% 0,color-mix(in srgb,var(--ac2) 16%,transparent),transparent 65%),var(--bg);
+  background-attachment:fixed;-webkit-font-smoothing:antialiased}
+/* ---------- encabezado ---------- */
+header{position:sticky;top:0;z-index:5;background:var(--glass);backdrop-filter:saturate(180%) blur(18px);-webkit-backdrop-filter:saturate(180%) blur(18px);
+  border-bottom:1px solid var(--bd);padding-top:env(safe-area-inset-top)}
+.hd{max-width:720px;margin:auto;padding:10px 16px 8px;display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:10px;box-shadow:0 4px 14px -4px color-mix(in srgb,var(--ac) 70%,transparent)}
+.hd h1{font-size:18px;margin:0;letter-spacing:-.02em;font-weight:750;line-height:1.1}
+.live{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:5px;margin-top:2px}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--up);box-shadow:0 0 0 0 var(--up);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.hd .sp{flex:1}
+#inst{border:0;background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;font-weight:650;
+  box-shadow:0 6px 18px -6px color-mix(in srgb,var(--ac) 80%,transparent)}
+/* ---------- cinta de indicadores ---------- */
+.tk{overflow:hidden;white-space:nowrap;border-top:1px solid var(--bd);touch-action:pan-y;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.tk-in{display:inline-flex;gap:10px;padding:8px 10px;animation:tk 50s linear infinite;will-change:transform}
+.tk:hover .tk-in,.tk:active .tk-in{animation-play-state:paused}
+.tk span.i{display:inline-flex;align-items:baseline;gap:6px;font-size:13px;font-variant-numeric:tabular-nums;background:var(--card);border:1px solid var(--bd);
+  border-radius:999px;padding:4px 11px}
+.tk small{color:var(--mut);font-size:11px}.tk b{font-weight:700}
+.up2{color:var(--up);font-weight:650}.dn{color:var(--dn);font-weight:650}
+@keyframes tk{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.tk{overflow-x:auto}.tk-in{animation:none}.live i{animation:none}}
+/* ---------- cuerpo ---------- */
+.wrap{max-width:720px;margin:auto;padding:0 16px}
+main{max-width:720px;margin:auto;padding:14px 16px calc(110px + env(safe-area-inset-bottom))}
+.sec{display:none}.sec.on{display:block;animation:in .28s ease both}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h2{font-size:12px;font-weight:700;color:var(--mut);margin:22px 4px 10px;text-transform:uppercase;letter-spacing:.09em;display:flex;align-items:center;gap:8px}
+h2:first-child{margin-top:4px}
+h2::after{content:"";flex:1;height:1px;background:var(--bd)}
+.empty{color:var(--mut);text-align:center;padding:40px 0}
+/* tarjetas de noticias */
+a.n{display:block;position:relative;background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:14px 16px;margin-bottom:10px;text-decoration:none;color:inherit;
+  box-shadow:var(--sh);transition:transform .15s,border-color .15s}
+a.n:active{transform:scale(.985)}
+a.n.hot{border-color:color-mix(in srgb,var(--dn) 45%,var(--bd))}
+a.n.hot::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:linear-gradient(var(--dn),var(--warn))}
+.t{font-weight:650;font-size:15.5px;line-height:1.35;letter-spacing:-.01em}
+.s{color:var(--mut);font-size:13.5px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.m{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:11.5px;color:var(--mut)}
+.src{color:var(--ac);font-weight:700;background:color-mix(in srgb,var(--ac) 12%,transparent);border-radius:999px;padding:2px 9px}
+.tag{border:1px solid var(--bd);border-radius:999px;padding:1px 8px;background:var(--card2)}
+.tag.bu{color:var(--up);border-color:color-mix(in srgb,var(--up) 45%,transparent);background:color-mix(in srgb,var(--up) 10%,transparent)}
+.tag.be{color:var(--dn);border-color:color-mix(in srgb,var(--dn) 45%,transparent);background:color-mix(in srgb,var(--dn) 10%,transparent)}
+/* alertas */
+.alert{max-width:720px;margin:12px auto 0;padding:0 16px}
+.alert div{background:linear-gradient(135deg,color-mix(in srgb,var(--warn) 22%,var(--card)),color-mix(in srgb,var(--dn) 12%,var(--card)));
+  border:1px solid color-mix(in srgb,var(--warn) 50%,var(--bd));border-radius:16px;padding:11px 14px;margin-bottom:8px;font-size:13.5px;box-shadow:var(--sh)}
+.tip{max-width:720px;margin:12px auto 0;padding:0 16px;font-size:13px}
+.tip div{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:11px 14px;box-shadow:var(--sh)}
+/* horarios de bolsa */
+.hrs{max-width:720px;margin:12px auto 0;padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mkt{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:10px 12px;box-shadow:var(--sh);display:flex;gap:10px;align-items:flex-start}
+.mkt .fl{font-size:20px;line-height:1}
+.mkt b{font-size:12.5px;letter-spacing:.01em}.mkt .st2{font-size:12px;color:var(--mut)}
+.mkt small{display:block;color:var(--mut);font-size:10.5px;margin-top:3px;line-height:1.3}
+.pill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;border-radius:999px;padding:1px 8px;margin-right:4px}
+.pill.on{background:color-mix(in srgb,var(--up) 18%,transparent);color:var(--up)}.pill.off{background:var(--bd);color:var(--mut)}
+/* eventos y resultados */
+.ev{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:11px 14px;margin-bottom:9px;display:flex;gap:12px;align-items:flex-start;box-shadow:var(--sh);position:relative}
+.ev.hi::before,.ev.md::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 4px 4px 0}
+.ev.hi::before{background:var(--dn)}.ev.md::before{background:var(--warn)}
+.ev .h{min-width:54px;text-align:center;font-weight:750;font-variant-numeric:tabular-nums;background:var(--card2);border:1px solid var(--bd);border-radius:12px;padding:6px 4px;font-size:13px}
+.ev .x{font-size:12px;color:var(--mut);margin-top:3px}
+.warn{font-size:12px;color:var(--mut);border:1px dashed var(--bd);border-radius:14px;padding:10px 12px;margin-bottom:12px;background:var(--card2)}
+/* sentimiento */
+.fg,.st{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--sh)}
+.bar{height:10px;border-radius:6px;background:linear-gradient(90deg,#e11d48,#f59e0b,#16a34a);position:relative;margin:12px 0}
+.bar i{position:absolute;top:-5px;width:6px;height:20px;background:var(--tx);border-radius:3px;transform:translateX(-3px);box-shadow:0 0 0 3px var(--card)}
+.sb{display:flex;height:8px;border-radius:5px;overflow:hidden;margin:8px 0;background:var(--bd);gap:2px}.sb u{background:var(--up);border-radius:4px}.sb s{background:var(--dn);border-radius:4px}
+.q{font-size:12.5px;color:var(--mut);margin-top:6px}
+/* navegación inferior */
+nav{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(560px,calc(100% - 20px));
+  display:grid;grid-template-columns:repeat(6,1fr);gap:2px;padding:6px;background:var(--glass);backdrop-filter:saturate(180%) blur(22px);-webkit-backdrop-filter:saturate(180%) blur(22px);
+  border:1px solid var(--bd);border-radius:24px;box-shadow:0 14px 40px -12px rgba(0,0,0,.45)}
+nav button{position:relative;border:0;background:none;color:var(--mut);font:inherit;font-size:10px;font-weight:650;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:7px 0 6px;border-radius:18px;transition:background .2s,color .2s}
+nav button .ic{font-size:19px;line-height:1;filter:grayscale(.7);transition:filter .2s,transform .2s}
+nav button.on{color:var(--tx);background:color-mix(in srgb,var(--ac) 16%,transparent)}
+nav button.on .ic{filter:none;transform:translateY(-1px) scale(1.08)}
+nav button em{position:absolute;top:2px;right:calc(50% - 22px);font-style:normal;font-size:9px;font-weight:800;min-width:16px;height:16px;line-height:16px;text-align:center;
+  border-radius:999px;background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;padding:0 4px}
+@media(min-width:900px){body{font-size:16px}}
+</style></head><body>
+<header>
+<div class="hd"><img class="logo" src="icon-192.png" alt="" width="34" height="34">
+<div><h1>Trading News</h1><div class="live"><i></i>Actualizado __UPDATED__ · hora Chile</div></div>
+<span class="sp"></span><button id="inst" hidden>📲 Instalar</button></div>
+__MKT__
+</header>
+<div class="tip" id="tip" hidden><div>📲 Para instalar en iPhone: toca <b>Compartir</b> ⬆️ y luego <b>Agregar a pantalla de inicio</b>.</div></div>
+<div class="hrs" id="hrs"></div>
+__ALERT__
+<main>__BODY__</main>
+<nav aria-label="Secciones">
+<button data-s="agenda" class="on"><span class="ic">📅</span>Agenda</button>
+<button data-s="chile"><span class="ic">🇨🇱</span>Chile<em>__NC__</em></button>
+<button data-s="mundo"><span class="ic">🌎</span>Mundo<em>__NM__</em></button>
+<button data-s="resultados"><span class="ic">📊</span>Resultados<em>__NR__</em></button>
+<button data-s="traders"><span class="ic">🧠</span>Traders<em>__NT__</em></button>
+<button data-s="ia"><span class="ic">🤖</span>IA<em>__NI__</em></button>
+</nav>
+<script>
+const b=document.querySelectorAll('nav button'),s=document.querySelectorAll('.sec');
+function show(k){b.forEach(x=>x.classList.toggle('on',x.dataset.s==k));s.forEach(x=>x.classList.toggle('on',x.id==k));try{localStorage.tab=k}catch(e){}}
+b.forEach(x=>x.onclick=()=>{show(x.dataset.s);scrollTo({top:0,behavior:'smooth'})});
+try{if(localStorage.tab&&document.getElementById(localStorage.tab))show(localStorage.tab);else show('agenda')}catch(e){show('agenda')}
+/* Horarios de bolsa en vivo (calculados en tu celular, con zonas horarias reales) */
+const MK=[{n:'Nueva York',tz:'America/New_York',o:[9,30],c:[16,0],f:'🇺🇸'},{n:'Londres',tz:'Europe/London',o:[8,0],c:[16,30],f:'🇬🇧'}];
+function parts(tz,d){const p={};new Intl.DateTimeFormat('en-US',{timeZone:tz,hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).forEach(x=>p[x.type]=x.value);p.h=(+p.hour)%24;p.m=+p.minute;return p}
+function fmtCL(d){return new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit',hour12:false}).format(d)}
+function atLocal(tz,y,mo,da,h,mi){/* instante UTC para una hora local de la plaza */let g=new Date(Date.UTC(y,mo-1,da,h,mi));for(let i=0;i<2;i++){const p=parts(tz,g);const dif=(Date.UTC(y,mo-1,da,h,mi)-Date.UTC(+p.year,+p.month-1,+p.day,p.h,p.m));g=new Date(g.getTime()+dif)}return g}
+function hrs(){const now=new Date();let out='';MK.forEach(m=>{const p=parts(m.tz,now),wd=!['Sat','Sun'].includes(p.weekday),mins=p.h*60+p.m,o=m.o[0]*60+m.o[1],c=m.c[0]*60+m.c[1],open=wd&&mins>=o&&mins<c;
+const op=atLocal(m.tz,+p.year,+p.month,+p.day,m.o[0],m.o[1]),cl=atLocal(m.tz,+p.year,+p.month,+p.day,m.c[0],m.c[1]);
+let est;if(open){const r=Math.round((cl-now)/60000);est='cierra en '+Math.floor(r/60)+' h '+r%60+' min'}else if(wd&&mins<o){const r=Math.round((op-now)/60000);est='abre en '+Math.floor(r/60)+' h '+r%60+' min'}else est='abre próximo día hábil';
+out+='<div class="mkt"><span class="fl">'+m.f+'</span><div><b>'+m.n+'</b> <span class="pill '+(open?'on':'off')+'">'+(open?'ABIERTO':'CERRADO')+'</span><div class="st2">'+est+'</div><small>Allá '+String(p.h).padStart(2,'0')+':'+String(p.m).padStart(2,'0')+' · En Chile '+fmtCL(op)+'–'+fmtCL(cl)+'</small></div></div>'});
+document.getElementById('hrs').innerHTML=out}
+hrs();setInterval(hrs,30000);
+/* Instalación como app */
+let dp=null;const inst=document.getElementById('inst'),tip=document.getElementById('tip');
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;if(!standalone)inst.hidden=false});
+inst.onclick=async()=>{if(dp){dp.prompt();await dp.userChoice;dp=null;inst.hidden=true}};
+addEventListener('appinstalled',()=>{inst.hidden=true;tip.hidden=true});
+if(!standalone&&/iphone|ipad|ipod/i.test(navigator.userAgent))tip.hidden=false;
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
