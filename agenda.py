@@ -29,6 +29,46 @@ WATCH = {
     "MRVL", "LRCX", "KLAC", "CDNS", "SNPS", "ABNB", "BKNG", "MELI", "CRWD", "MDLZ", "ADP", "GILD", "AMGN",
 }
 MIN_CAP = 100e9  # además, cualquier empresa de más de US$100.000 millones
+NY = ZoneInfo("America/New_York") if "ZoneInfo" in globals() else None
+
+# Composición conocida de los índices (puede cambiar con rebalanceos; es orientativa)
+NDX = {
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "AVGO", "NFLX", "COST", "AMD", "ADBE", "QCOM",
+    "INTC", "CSCO", "PEP", "TMUS", "AMAT", "INTU", "MU", "ASML", "PANW", "ARM", "PYPL", "SBUX", "MRVL", "LRCX",
+    "KLAC", "CDNS", "SNPS", "ABNB", "BKNG", "MELI", "CRWD", "MDLZ", "ADP", "GILD", "AMGN", "TXN", "ISRG", "HON",
+    "VRTX", "REGN", "CMCSA", "ADI", "LIN", "CSX", "ORLY", "MAR", "FTNT", "WDAY", "DDOG", "TEAM", "ROP", "PLTR",
+}
+DOW = {
+    "AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS", "GS", "HD", "HON", "IBM", "JNJ", "JPM",
+    "KO", "MCD", "MMM", "MRK", "MSFT", "NKE", "NVDA", "PG", "SHW", "TRV", "UNH", "V", "VZ", "WMT",
+}
+NOT_SP = {  # extranjeras / ADR / fuera del S&P 500
+    "ASML", "ARM", "MELI", "HSBC", "TM", "SAP", "SNY", "NVS", "UL", "BP", "SHEL", "TSM", "TTE", "BTI", "DEO", "SONY",
+    "SMFG", "MUFG", "HDB", "IBN", "BABA", "PDD", "NVO", "AZN", "RY", "TD", "BNS", "BMO", "ENB", "SHOP", "TCEHY",
+    "TME", "JD", "BIDU", "MUFG", "NTES", "SE", "CP", "CNQ", "SU", "BHP", "RIO", "VALE", "PBR", "ITUB", "LYG", "BCS",
+}
+
+
+def indices(sym):
+    out = []
+    if sym in NDX:
+        out.append("Nasdaq 100 (US100)")
+    if sym not in NOT_SP:
+        out.append("S&P 500")
+    if sym in DOW:
+        out.append("Dow Jones")
+    return out
+
+
+def release_window(date_iso, when):
+    """Ventana típica de publicación convertida a hora de Chile (la hora exacta la confirma cada empresa)."""
+    if NY is None or when not in ("time-pre-market", "time-after-hours"):
+        return ""
+    y, m, d = map(int, date_iso.split("-"))
+    a, b = ((7, 0), (9, 0)) if when == "time-pre-market" else ((16, 5), (16, 30))
+    t1 = datetime(y, m, d, a[0], a[1], tzinfo=NY).astimezone(TZ)
+    t2 = datetime(y, m, d, b[0], b[1], tzinfo=NY).astimezone(TZ)
+    return f"{t1:%H:%M}–{t2:%H:%M}"
 SESSION = {"time-pre-market": "antes de la apertura", "time-after-hours": "después del cierre",
            "time-not-supplied": "hora por confirmar"}
 
@@ -89,7 +129,9 @@ def _earn_day(day):
             out.append({"date": day.isoformat(), "symbol": q["symbol"], "name": q.get("name", ""),
                         "session": SESSION.get(q.get("time"), "hora por confirmar"),
                         "when": q.get("time", ""), "cap": cap, "eps": q.get("epsForecast", ""),
-                        "quarter": q.get("fiscalQuarterEnding", ""), "watch": q["symbol"] in WATCH})
+                        "quarter": q.get("fiscalQuarterEnding", ""), "watch": q["symbol"] in WATCH,
+                        "window": release_window(day.isoformat(), q.get("time")),
+                        "indices": indices(q["symbol"])})
     return out
 
 

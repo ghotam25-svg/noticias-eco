@@ -443,7 +443,9 @@ def render_agenda(ag):
     if not days:
         parts.append('<div class="empty">Sin eventos próximos.</div>')
     # --- resultados de grandes empresas ---
-    parts.append("<h2>📊 Entrega de resultados · grandes empresas</h2>")
+    parts.append("<h2>📊 Entrega de resultados · grandes empresas</h2>"
+                 '<div class="x" style="margin:-4px 0 8px;color:var(--mut)">La hora es la ventana típica según si reportan antes de la apertura '
+                 'o después del cierre; la empresa confirma la hora exacta. Índices según su composición conocida.</div>')
     by = {}
     for q in ag.get("earnings", []):
         by.setdefault(q["date"], []).append(q)
@@ -454,8 +456,10 @@ def render_agenda(ag):
             cap = f'US$ {q["cap"] / 1e9:,.0f} mil millones'.replace(",", ".") if q["cap"] else ""
             eps = f' · BPA esperado {e(q["eps"])}' if q.get("eps") else ""
             star = "⭐ " if q.get("watch") else ""
+            hora = f' · 🕒 ~{q["window"]} hora Chile' if q.get("window") else ""
+            idx = f'<div class="x">📈 Podría mover: <b>{e(" · ".join(q["indices"]))}</b></div>' if q.get("indices") else ""
             parts.append(f'<div class="ev md"><div class="h">{e(q["symbol"])}</div><div><div class="t">{star}{e(q["name"])}</div>'
-                         f'<div class="x">{e(q["session"])}{eps} · {cap}</div></div></div>')
+                         f'<div class="x">{e(q["session"])}{hora}{eps} · {cap}</div>{idx}</div></div>')
         if day - today <= timedelta(days=1):
             names = ", ".join(q["symbol"] for q in by[ds] if q.get("watch"))[:80]
             if names:
