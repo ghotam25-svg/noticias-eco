@@ -145,7 +145,11 @@ def parse_date(e):
 def fetch_source(section, name, url, lang, via_gnews):
     items = []
     try:
-        r = requests.get(url, headers=UA, timeout=20)
+        for intento in range(3):  # Google News y otros limitan (429) a los servidores compartidos de GitHub
+            r = requests.get(url, headers=UA, timeout=20)
+            if r.status_code not in (429, 503):
+                break
+            time.sleep(4 * (intento + 1))
         r.raise_for_status()
         feed = feedparser.parse(r.content)
     except Exception as ex:
@@ -305,11 +309,34 @@ def score(it):
     return s
 
 
+def previous_items():
+    """Noticias de la pasada anterior (local o sitio publicado): se conservan si una fuente falla."""
+    try:
+        return json.loads((OUT / "news.json").read_text(encoding="utf-8"))["items"]
+    except Exception:
+        pass
+    url = os.environ.get("PUBLISHED_JSON_URL")
+    if url:
+        try:
+            return requests.get(url + "?nc=" + str(int(time.time())), timeout=15).json()["items"]
+        except Exception:
+            pass
+    return []
+
+
 def collect():
     all_items = []
-    with ThreadPoolExecutor(8) as ex:
+    with ThreadPoolExecutor(4) as ex:
         for res in ex.map(lambda a: fetch_source(*a), SOURCES):
             all_items += res
+    now = time.time()
+    kept = 0
+    for p in previous_items():
+        age = (60 if p["section"] in ("ia", "traders") else 30) * 3600
+        if now - p["ts"] < age and p.get("title_es") and not p.get("failed"):
+            all_items.append(p)
+            kept += 1
+    print(f"  conservadas de la pasada anterior: {kept}")
     # dedupe por título normalizado
     seen, out = set(), []
     for it in sorted(all_items, key=lambda x: -x["ts"]):
