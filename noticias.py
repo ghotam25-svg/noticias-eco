@@ -26,6 +26,7 @@ import feedparser
 import requests
 
 import agenda
+import traders
 from deep_translator import GoogleTranslator, MyMemoryTranslator
 
 OUT = Path(__file__).parent / "docs"
@@ -77,6 +78,11 @@ SOURCES = [
     ("ia", "Google IA", "https://blog.google/technology/ai/rss/", "en", False),
     ("ia", "IA: OpenAI, Anthropic, Google, Nvidia",
      gnews("(OpenAI OR Anthropic OR Gemini OR \"Claude\" OR Nvidia OR \"artificial intelligence\") when:1d", "en"), "en", True),
+    # --- Opiniones de analistas y traders ---
+    ("traders", "FXStreet", "https://www.fxstreet.com/rss/analysis", "en", False),
+    ("traders", "Analistas: mejoras y rebajas",
+     gnews("(upgrade OR downgrade OR \"price target\" OR \"initiates coverage\") "
+           "(Nasdaq OR Nvidia OR Apple OR Microsoft OR Tesla OR Amazon OR Alphabet OR Meta OR Broadcom) when:2d", "en"), "en", True),
     # --- Resultados de empresas Nasdaq ---
     ("resultados", "Nasdaq.com", "https://www.nasdaq.com/feed/rssoutbound?category=Earnings", "en", False),
     ("resultados", "CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html", "en", False),
@@ -164,11 +170,11 @@ def fetch_source(section, name, url, lang, via_gnews):
         else:
             shown = name
         d = parse_date(e)
-        if not d or now - d > (timedelta(hours=60) if section == "ia" else MAX_AGE) or d - now > timedelta(hours=2):
+        if not d or now - d > (timedelta(hours=60) if section in ("ia", "traders") else MAX_AGE) or d - now > timedelta(hours=2):
             continue
         if len(title) < 30 or JUNK.search(title):
             continue
-        if (via_gnews and section != "ia" or name == "Cooperativa") and not ECON.search(title):
+        if (via_gnews and section not in ("ia", "traders") or name == "Cooperativa") and not ECON.search(title):
             continue
         if via_gnews and (BAD_SRC.search(shown) or not GOOD_SRC.search(shown)):
             continue
@@ -310,13 +316,14 @@ def collect():
     # En "resultados" solo lo que realmente habla de resultados
     out = [i for i in out if i["section"] != "resultados" or EARN.search(i["title"] + " " + i["summary"])]
     final = []
-    for sec in ("chile", "mundo", "resultados", "ia"):
+    for sec in ("chile", "mundo", "resultados", "ia", "traders"):
         sec_items = [i for i in out if i["section"] == sec]
         sec_items.sort(key=lambda i: (-score(i), -i["ts"]))
         top = sec_items[:PER_SECTION]
         top.sort(key=lambda i: -i["ts"])
         for i in top:
             i["hot"] = score(i) >= 2
+            i["stance"] = traders.stance(i["title"] + " " + i["summary"]) if sec == "traders" else ""
         final += top
     return final
 
@@ -363,6 +370,14 @@ h2{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;le
 .ev.hi{border-left:4px solid var(--hot)}.ev.md{border-left:4px solid #f59e0b}
 .ev .h{min-width:48px;font-weight:700;font-variant-numeric:tabular-nums}
 .ev .x{font-size:12px;color:var(--mut);margin-top:2px}
+.tag.bu{color:#16a34a;border-color:#16a34a}.tag.be{color:#dc2626;border-color:#dc2626}
+.warn{font-size:12px;color:var(--mut);border:1px dashed var(--bd);border-radius:10px;padding:8px 10px;margin-bottom:10px}
+.fg{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.bar{height:10px;border-radius:6px;background:linear-gradient(90deg,#dc2626,#f59e0b,#16a34a);position:relative;margin:8px 0}
+.bar i{position:absolute;top:-4px;width:4px;height:18px;background:var(--tx);border-radius:2px;transform:translateX(-2px)}
+.st{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 14px;margin-bottom:8px}
+.sb{display:flex;height:8px;border-radius:5px;overflow:hidden;margin:6px 0;background:var(--bd)}.sb u{background:#16a34a}.sb s{background:#dc2626}
+.q{font-size:13px;color:var(--mut);margin-top:4px}
 .tk{overflow:hidden;white-space:nowrap;margin:0 -16px;border-top:1px solid var(--bd);background:var(--card);touch-action:pan-y}
 .tk-in{display:inline-flex;gap:26px;padding:7px 13px;animation:tk 45s linear infinite;will-change:transform}
 .tk:hover .tk-in,.tk:active .tk-in{animation-play-state:paused}
@@ -377,7 +392,7 @@ h2{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;le
 </style></head><body>
 <header><div class="top"><h1><img src="favicon.png" alt="" width="26" height="26"> Trading News</h1><button id="inst" hidden>📲 Instalar</button></div>
 <div class="up">Actualizado __UPDATED__ (hora Chile) · se refresca sola cada 10 min</div>
-<nav><button data-s="agenda" class="on">📅 Agenda</button><button data-s="chile">🇨🇱 Chile (__NC__)</button><button data-s="mundo">🌎 EE.UU. y mundo (__NM__)</button><button data-s="resultados">📊 Resultados (__NR__)</button><button data-s="ia">🤖 IA (__NI__)</button></nav>__MKT__</header>
+<nav><button data-s="agenda" class="on">📅 Agenda</button><button data-s="chile">🇨🇱 Chile (__NC__)</button><button data-s="mundo">🌎 EE.UU. y mundo (__NM__)</button><button data-s="resultados">📊 Resultados (__NR__)</button><button data-s="traders">🧠 Traders (__NT__)</button><button data-s="ia">🤖 IA (__NI__)</button></nav>__MKT__</header>
 <div class="tip" id="tip" hidden><div>📲 Para instalar en iPhone: toca <b>Compartir</b> ⬆️ y luego <b>Agregar a pantalla de inicio</b>.</div></div>
 <div class="hrs" id="hrs"></div>
 __ALERT__
@@ -439,6 +454,35 @@ def render_markets(mk):
     return f'<div class="tk" aria-label="Indicadores de mercado"><div class="tk-in">{row}{row}</div></div>'
 
 
+def render_sentiment(sn):
+    e = html.escape
+    out = ['<div class="warn">⚠️ Son opiniones de terceros (analistas y usuarios de StockTwits), no recomendaciones de inversión. '
+           'Pueden estar equivocadas; decide con tu propio análisis.</div>']
+    f = sn.get("fng")
+    if f:
+        out.append(f'<div class="fg"><div class="t">Índice Miedo y Codicia (CNN): <b>{f["score"]}/100 · {e(f["rating"])}</b></div>'
+                   f'<div class="bar"><i style="left:{f["score"]}%"></i></div>'
+                   f'<div class="x">Ayer: {f["prev"]} · Hace 1 semana: {f["week"]} · 0 = miedo extremo · 100 = codicia extrema</div></div>')
+    if sn.get("stocktwits"):
+        out.append("<h2>💬 Qué dicen los traders en StockTwits</h2>")
+        for x in sn["stocktwits"]:
+            tot = x["bull"] + x["bear"]
+            if tot:
+                pb = round(x["bull"] / tot * 100)
+                verdict = "mayoría alcista 🟢" if pb >= 60 else ("mayoría bajista 🔴" if pb <= 40 else "dividido ⚪")
+                bar = f'<div class="sb"><u style="width:{pb}%"></u><s style="width:{100 - pb}%"></s></div>'
+                line = f'{pb}% alcista · {100 - pb}% bajista ({tot} opinan de {x["n"]} mensajes) — {verdict}'
+            else:
+                bar, line = "", "Sin opiniones etiquetadas en la muestra"
+            msgs = "".join(f'<div class="q">{"🟢" if m["side"] == "alcista" else "🔴"} “{e(m.get("text_es", m["text"]))[:220]}” — @{e(m["user"])}</div>'
+                           for m in x["msgs"])
+            out.append(f'<div class="st"><div class="t">{e(x["name"])} <small style="color:var(--mut)">({e(x["symbol"])})</small></div>{bar}'
+                       f'<div class="x">{line}</div>{msgs}</div>')
+        out.append('<div class="x" style="margin-bottom:8px">Muestra pequeña: últimos ~30 mensajes por activo; sirve como termómetro, no como señal.</div>')
+    out.append("<h2>📰 Análisis y calificaciones de analistas</h2>")
+    return "".join(out)
+
+
 def render_agenda(ag):
     e = html.escape
     now = datetime.now(TZ_CL)
@@ -497,7 +541,7 @@ def render(items, agenda):
     counts = {}
     ag_html, alert_html = render_agenda(agenda)
     body.append(ag_html)
-    for sec in ("chile", "mundo", "resultados", "ia"):
+    for sec in ("chile", "mundo", "resultados", "ia", "traders"):
         its = [i for i in items if i["section"] == sec]
         counts[sec] = len(its)
         cards = []
@@ -505,17 +549,19 @@ def render(items, agenda):
             e = html.escape
             summ = f'<div class="s">{e(i["summary_es"])}</div>' if i.get("summary_es") else ""
             tag = '<span class="tag">traducido del inglés</span>' if i["lang"] == "en" else ""
+            tag += {"alcista": '<span class="tag bu">🟢 Tono alcista</span>', "bajista": '<span class="tag be">🔴 Tono bajista</span>',
+                    "neutral": '<span class="tag">⚪ Neutral</span>'}.get(i.get("stance", ""), "")
             cards.append(
                 f'<a class="n{" hot" if i.get("hot") else ""}" href="{e(i["link"])}" target="_blank" rel="noopener">'
                 f'<div class="t">{e(i["title_es"])}</div>{summ}'
                 f'<div class="m"><span class="src">{e(i["source"])}</span><span>{ago(i["ts"])}</span>{tag}</div></a>'
             )
-        body.append(f'<section class="sec" id="{sec}">'
+        body.append(f'<section class="sec" id="{sec}">' + (render_sentiment(agenda.get("sentiment", {})) if sec == "traders" else "")
                     + ("".join(cards) or '<div class="empty">Sin noticias nuevas por ahora.</div>') + "</section>")
     now = datetime.now(TZ_CL).strftime("%d-%m %H:%M")
     return (PAGE.replace("__UPDATED__", now).replace("__BODY__", "\n".join(body))
             .replace("__NC__", str(counts["chile"])).replace("__NM__", str(counts["mundo"]))
-            .replace("__NR__", str(counts["resultados"])).replace("__NI__", str(counts["ia"]))
+            .replace("__NR__", str(counts["resultados"])).replace("__NI__", str(counts["ia"])).replace("__NT__", str(counts["traders"]))
             .replace("__ALERT__", alert_html).replace("__MKT__", render_markets(agenda.get("markets", []))))
 
 
@@ -524,6 +570,7 @@ def run_once():
     items = collect()
     translate(items)
     ag = agenda.build(lambda ts: _batch(ts))
+    ag["sentiment"] = traders.sentiment(lambda ts: _batch(ts))
     ag["notified"] = agenda.notify(ag, previous_notified())
     OUT.mkdir(exist_ok=True)
     (OUT / "news.json").write_text(
