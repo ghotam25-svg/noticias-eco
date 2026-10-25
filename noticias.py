@@ -363,10 +363,13 @@ h2{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;le
 .ev.hi{border-left:4px solid var(--hot)}.ev.md{border-left:4px solid #f59e0b}
 .ev .h{min-width:48px;font-weight:700;font-variant-numeric:tabular-nums}
 .ev .x{font-size:12px;color:var(--mut);margin-top:2px}
-.mk{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 2px;max-width:720px;margin:auto}
-.mk div{flex:0 0 auto;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:6px 10px;min-width:104px}
-.mk small{display:block;color:var(--mut);font-size:11px;white-space:nowrap}
-.mk b{font-variant-numeric:tabular-nums}.up2{color:#16a34a}.dn{color:#dc2626}
+.tk{overflow:hidden;white-space:nowrap;margin:0 -16px;border-top:1px solid var(--bd);background:var(--card);touch-action:pan-y}
+.tk-in{display:inline-flex;gap:26px;padding:7px 13px;animation:tk 45s linear infinite;will-change:transform}
+.tk:hover .tk-in,.tk:active .tk-in{animation-play-state:paused}
+.tk span.i{font-size:13px;font-variant-numeric:tabular-nums}.tk small{color:var(--mut);margin-right:5px}
+.tk b{margin-right:4px}.up2{color:#16a34a}.dn{color:#dc2626}
+@keyframes tk{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.tk{overflow-x:auto}.tk-in{animation:none}}
 .hrs{max-width:720px;margin:8px auto 0;padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px}
 .hrs div{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 10px}
 .hrs small{color:var(--mut);display:block;font-size:11px}
@@ -374,9 +377,8 @@ h2{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;le
 </style></head><body>
 <header><div class="top"><h1><img src="favicon.png" alt="" width="26" height="26"> Trading News</h1><button id="inst" hidden>📲 Instalar</button></div>
 <div class="up">Actualizado __UPDATED__ (hora Chile) · se refresca sola cada 10 min</div>
-<nav><button data-s="agenda" class="on">📅 Agenda</button><button data-s="chile">🇨🇱 Chile (__NC__)</button><button data-s="mundo">🌎 EE.UU. y mundo (__NM__)</button><button data-s="resultados">📊 Resultados (__NR__)</button><button data-s="ia">🤖 IA (__NI__)</button></nav></header>
+<nav><button data-s="agenda" class="on">📅 Agenda</button><button data-s="chile">🇨🇱 Chile (__NC__)</button><button data-s="mundo">🌎 EE.UU. y mundo (__NM__)</button><button data-s="resultados">📊 Resultados (__NR__)</button><button data-s="ia">🤖 IA (__NI__)</button></nav>__MKT__</header>
 <div class="tip" id="tip" hidden><div>📲 Para instalar en iPhone: toca <b>Compartir</b> ⬆️ y luego <b>Agregar a pantalla de inicio</b>.</div></div>
-__MKT__
 <div class="hrs" id="hrs"></div>
 __ALERT__
 <main>__BODY__</main>
@@ -431,9 +433,10 @@ def render_markets(mk):
     for q in mk:
         up = q["pct"] >= 0
         price = f'{q["price"]:,.{q["dec"]}f}'.replace(",", "X").replace(".", ",").replace("X", ".")
-        chips.append(f'<div><small>{html.escape(q["name"])}</small><b>{price}</b> '
-                     f'<span class="{"up2" if up else "dn"}">{"▲" if up else "▼"} {abs(q["pct"]):.2f}%</span></div>')
-    return '<div class="mk">' + "".join(chips) + "</div>"
+        chips.append(f'<span class="i"><small>{html.escape(q["name"])}</small><b>{price}</b>'
+                     f'<span class="{"up2" if up else "dn"}">{"▲" if up else "▼"} {abs(q["pct"]):.2f}%</span></span>')
+    row = "".join(chips)
+    return f'<div class="tk" aria-label="Indicadores de mercado"><div class="tk-in">{row}{row}</div></div>'
 
 
 def render_agenda(ag):
