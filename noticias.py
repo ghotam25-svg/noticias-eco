@@ -80,6 +80,7 @@ SOURCES = [
      gnews("(OpenAI OR Anthropic OR Gemini OR \"Claude\" OR Nvidia OR \"artificial intelligence\") when:1d", "en"), "en", True),
     # --- Opiniones de analistas y traders ---
     ("traders", "FXStreet", "https://www.fxstreet.com/rss/analysis", "en", False),
+    ("traders", "FXStreet", gnews("site:fxstreet.com (forecast OR analysis) when:2d", "en"), "en", True),
     ("traders", "Analistas: mejoras y rebajas",
      gnews("(upgrade OR downgrade OR \"price target\" OR \"initiates coverage\") "
            "(Nasdaq OR Nvidia OR Apple OR Microsoft OR Tesla OR Amazon OR Alphabet OR Meta OR Broadcom) when:2d", "en"), "en", True),
@@ -162,7 +163,7 @@ def fetch_source(section, name, url, lang, via_gnews):
                 title = title[: -len(suffix)]
             # En consultas por tema, la fuente real es la que informa Google.
             shown = src or name
-            if name.startswith(("Chile:", "Fed /", "Resultados")):
+            if name.startswith(("Chile:", "Fed /", "Resultados", "Analistas", "IA:")):
                 pass
             else:
                 # consultas site:… → forzamos el nombre de la fuente pedida
@@ -176,7 +177,11 @@ def fetch_source(section, name, url, lang, via_gnews):
             continue
         if (via_gnews and section not in ("ia", "traders") or name == "Cooperativa") and not ECON.search(title):
             continue
-        if via_gnews and (BAD_SRC.search(shown) or not GOOD_SRC.search(shown)):
+        if via_gnews and section == "traders":
+            # calificaciones de analistas llegan de muchas casas (TipRanks, Benzinga, Zacks...): solo se excluyen foros
+            if re.search(r"tradingview|moomoo|stocktwits|reddit|youtube", shown, re.I):
+                continue
+        elif via_gnews and (BAD_SRC.search(shown) or not GOOD_SRC.search(shown)):
             continue
         summary = "" if via_gnews else clean(e.get("summary"))
         if summary.lower().startswith(title.lower()[:40]):
