@@ -88,16 +88,17 @@ HOT = re.compile(
     re.I,
 )
 ECON = re.compile(
-    r"econom|mercado|bolsa|d[óo]lar|inflaci|ipc|tasa|banco|fed|empres|inversi|precio|cobre|pib|empleo|"
-    r"desempleo|impuesto|reforma|presupuesto|deuda|fiscal|aranc|comercio|exporta|import|petr[óo]leo|litio|bitcoin|"
-    r"utilidad|ganancia|quiebra|fusi|compra de|minera|retail|afp|pensi|sueldo|salario|"
-    r"econom|market|stock|shares|inflation|rate cut|rate hike|interest rate|bank|earnings|trade|tariff|oil|jobs|"
-    r"gdp|bond|treasur|yield|dollar|invest|merger|acquisition|profit|revenue|ecb|budget|debt|recession|"
-    r"wall street|nasdaq|s&p|dow|crypto|ipo|layoffs|forecast|sales|ceo|guidance", re.I)
+    r"\b(?:econom|mercado|bolsa|d[óo]lar|inflaci|ipc\b|tasas?\b|banco|\bfed\b|empresa|inversi[óo]n|inversionista|"
+    r"precios?\b|cobre\b|pib\b|empleo|desempleo|impuesto|reforma tributaria|presupuesto|deuda|fiscal|aranc|comercio|"
+    r"exportaci|importaci|petr[óo]leo|litio|bitcoin|utilidades|ganancias|quiebra|fusi[óo]n|minera|retail|afp\b|"
+    r"pensiones|sueldo|salario|imacec|ipsa|codelco|sqm|"
+    r"market|stocks?\b|shares|inflation|rate cut|rate hike|interest rate|bank|earnings|trade\b|tariff|oil\b|jobs|"
+    r"gdp|bonds?\b|treasur|yield|dollar|invest(?:or|ors|ment|ments)\b|merger|acquisition|profit|revenue|ecb\b|budget|"
+    r"debt|recession|wall street|nasdaq|s&p|dow\b|crypto|ipo\b|layoffs|forecast|guidance)", re.I)
 GOOD_SRC = re.compile(
     r"reuters|bloomberg|wall street journal|wsj|cnbc|financial times|marketwatch|barron|forbes|business insider|"
     r"nasdaq|la tercera|diario financiero|emol|ex-ante|america economia|américa economía|el mercurio|biobio|"
-    r"cooperativa|meganoticias|the economist|associated press|ap news|bbc|ft\.com|axios|fortune|"
+    r"cooperativa|meganoticias|the economist|associated press|\bap news|bbc|ft\.com|axios|fortune|"
     r"el dínamo|el economista|expansión|infobae|el país|cnn|t13|24horas|pauta|elmostrador|ciper|"
     r"investopedia|the motley fool|stockstory|financialcontent|globe newswire|business wire|pr newswire", re.I)
 BAD_SRC = re.compile(r"tradingview|moomoo|opening bell|stocktwits|marketbeat|stockanalysis|yahoo finance uk|"
