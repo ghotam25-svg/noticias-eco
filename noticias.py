@@ -13,6 +13,7 @@ import html
 import json
 import os
 import re
+import shutil
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -327,13 +328,22 @@ PAGE = """<!doctype html>
 <meta http-equiv="refresh" content="300">
 <meta name="theme-color" content="#0b1220">
 <link rel="manifest" href="manifest.json">
-<title>Noticias Económicas</title>
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trading News">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Trading News</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--tx:#111827;--mut:#6b7280;--ac:#0b5fff;--hot:#e11d48;--bd:#e5e7eb}
 @media(prefers-color-scheme:dark){:root{--bg:#0b1220;--card:#131c2e;--tx:#e8edf7;--mut:#8b97ad;--ac:#6ea0ff;--hot:#fb7185;--bd:#22304a}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 header{position:sticky;top:0;background:var(--bg);padding:12px 16px 0;border-bottom:1px solid var(--bd);z-index:2}
-h1{font-size:18px;margin:0 0 2px}.up{color:var(--mut);font-size:12px;margin-bottom:8px}
+h1{font-size:18px;margin:0 0 2px}.top{display:flex;justify-content:space-between;align-items:center;gap:8px}h1 img{vertical-align:-6px;border-radius:6px}
+#inst{border:0;background:var(--ac);color:#fff;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600}
+.tip{max-width:720px;margin:10px auto 0;padding:0 16px;font-size:13px}.tip div{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 14px}
+.up{color:var(--mut);font-size:12px;margin-bottom:8px}
 nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px}
 nav button{flex:1;white-space:nowrap;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 12px;border-radius:999px;font:inherit;font-size:14px}
 nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
@@ -362,9 +372,10 @@ h2{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;le
 .hrs small{color:var(--mut);display:block;font-size:11px}
 .on-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:#16a34a}.off-dot{background:#9ca3af}
 </style></head><body>
-<header><h1>📰 Noticias Económicas</h1>
+<header><div class="top"><h1><img src="favicon.png" alt="" width="26" height="26"> Trading News</h1><button id="inst" hidden>📲 Instalar</button></div>
 <div class="up">Actualizado __UPDATED__ (hora Chile) · se refresca sola cada 10 min</div>
 <nav><button data-s="agenda" class="on">📅 Agenda</button><button data-s="chile">🇨🇱 Chile (__NC__)</button><button data-s="mundo">🌎 EE.UU. y mundo (__NM__)</button><button data-s="resultados">📊 Resultados (__NR__)</button><button data-s="ia">🤖 IA (__NI__)</button></nav></header>
+<div class="tip" id="tip" hidden><div>📲 Para instalar en iPhone: toca <b>Compartir</b> ⬆️ y luego <b>Agregar a pantalla de inicio</b>.</div></div>
 __MKT__
 <div class="hrs" id="hrs"></div>
 __ALERT__
@@ -385,6 +396,14 @@ let est;if(open){const r=Math.round((cl-now)/60000);est='cierra en '+Math.floor(
 out+='<div><small>'+m.f+' '+m.n+'</small><span class="on-dot'+(open?'':' off-dot')+'"></span><b>'+(open?'ABIERTO':'CERRADO')+'</b> · '+est+'<small>Allá son las '+String(p.h).padStart(2,'0')+':'+String(p.m).padStart(2,'0')+' · Horario en Chile: '+fmtCL(op)+' a '+fmtCL(cl)+'</small></div>'});
 document.getElementById('hrs').innerHTML=out}
 hrs();setInterval(hrs,30000);
+/* Instalación como app */
+let dp=null;const inst=document.getElementById('inst'),tip=document.getElementById('tip');
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;if(!standalone)inst.hidden=false});
+inst.onclick=async()=>{if(dp){dp.prompt();await dp.userChoice;dp=null;inst.hidden=true}};
+addEventListener('appinstalled',()=>{inst.hidden=true;tip.hidden=true});
+if(!standalone&&/iphone|ipad|ipod/i.test(navigator.userAgent))tip.hidden=false;
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>"""
 
 
@@ -508,9 +527,18 @@ def run_once():
         json.dumps({"generated": time.time(), "items": items, "agenda": ag}, ensure_ascii=False), encoding="utf-8")
     (OUT / "index.html").write_text(render(items, ag), encoding="utf-8")
     (OUT / "manifest.json").write_text(json.dumps({
-        "name": "Noticias Económicas", "short_name": "Noticias", "start_url": "./",
-        "display": "standalone", "background_color": "#0b1220", "theme_color": "#0b1220",
-        "icons": []}), encoding="utf-8")
+        "id": "./", "name": "Trading News", "short_name": "Trading News",
+        "description": "Noticias económicas, agenda de resultados e indicadores en tiempo real",
+        "lang": "es", "start_url": "./", "scope": "./", "display": "standalone", "orientation": "portrait",
+        "background_color": "#0b1220", "theme_color": "#0b1220",
+        "icons": [
+            {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+            {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]},
+        ensure_ascii=False), encoding="utf-8")
+    for f in (Path(__file__).parent / "static").glob("*"):
+        shutil.copy(f, OUT / f.name)
     print(f"  listo: {len(items)} noticias en {OUT / 'index.html'}")
 
 
