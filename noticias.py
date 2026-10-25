@@ -23,13 +23,15 @@ from pathlib import Path
 
 import feedparser
 import requests
+
+import agenda
 from deep_translator import GoogleTranslator, MyMemoryTranslator
 
 OUT = Path(__file__).parent / "docs"
 UA = {"User-Agent": "Mozilla/5.0 (compatible; NoticiasEco/1.0)"}
 MAX_AGE = timedelta(hours=30)
 PER_SECTION = 40
-TZ_CL = timezone(timedelta(hours=-3))  # hora de Chile (aprox.; solo para mostrar)
+TZ_CL = agenda.TZ  # hora de Chile
 
 
 def gnews(q, lang="es"):
@@ -65,6 +67,15 @@ SOURCES = [
     ("mundo", "Wall Street Journal", gnews("site:wsj.com (economy OR markets OR Fed) when:1d", "en"), "en", True),
     ("mundo", "Fed / inflación / empleo EE.UU.",
      gnews("(Fed OR \"Federal Reserve\" OR CPI OR \"jobs report\" OR GDP OR tariffs) when:1d", "en"), "en", True),
+    # --- Inteligencia artificial ---
+    ("ia", "TechCrunch IA", "https://techcrunch.com/category/artificial-intelligence/feed/", "en", False),
+    ("ia", "The Verge IA", "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", "en", False),
+    ("ia", "MIT Technology Review", "https://www.technologyreview.com/topic/artificial-intelligence/feed", "en", False),
+    ("ia", "Ars Technica IA", "https://arstechnica.com/ai/feed/", "en", False),
+    ("ia", "OpenAI", "https://openai.com/news/rss.xml", "en", False),
+    ("ia", "Google IA", "https://blog.google/technology/ai/rss/", "en", False),
+    ("ia", "IA: OpenAI, Anthropic, Google, Nvidia",
+     gnews("(OpenAI OR Anthropic OR Gemini OR \"Claude\" OR Nvidia OR \"artificial intelligence\") when:1d", "en"), "en", True),
     # --- Resultados de empresas Nasdaq ---
     ("resultados", "Nasdaq.com", "https://www.nasdaq.com/feed/rssoutbound?category=Earnings", "en", False),
     ("resultados", "CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html", "en", False),
@@ -152,11 +163,11 @@ def fetch_source(section, name, url, lang, via_gnews):
         else:
             shown = name
         d = parse_date(e)
-        if not d or now - d > MAX_AGE or d - now > timedelta(hours=2):
+        if not d or now - d > (timedelta(hours=60) if section == "ia" else MAX_AGE) or d - now > timedelta(hours=2):
             continue
         if len(title) < 30 or JUNK.search(title):
             continue
-        if (via_gnews or name == "Cooperativa") and not ECON.search(title):
+        if (via_gnews and section != "ia" or name == "Cooperativa") and not ECON.search(title):
             continue
         if via_gnews and (BAD_SRC.search(shown) or not GOOD_SRC.search(shown)):
             continue
@@ -259,6 +270,21 @@ def translate(items):
     print(f"  traducidas nuevas: {ok}/{len(todo)}")
 
 
+def previous_notified():
+    """Avisos push ya enviados (se leen del sitio publicado o del archivo local)."""
+    try:
+        return json.loads((OUT / "news.json").read_text(encoding="utf-8"))["agenda"]["notified"]
+    except Exception:
+        pass
+    url = os.environ.get("PUBLISHED_JSON_URL")
+    if url:
+        try:
+            return requests.get(url, timeout=15).json()["agenda"]["notified"]
+        except Exception:
+            pass
+    return []
+
+
 def score(it):
     txt = it["title"] + " " + it["summary"]
     s = 2 if HOT.search(txt) else 0
@@ -283,7 +309,7 @@ def collect():
     # En "resultados" solo lo que realmente habla de resultados
     out = [i for i in out if i["section"] != "resultados" or EARN.search(i["title"] + " " + i["summary"])]
     final = []
-    for sec in ("chile", "mundo", "resultados"):
+    for sec in ("chile", "mundo", "resultados", "ia"):
         sec_items = [i for i in out if i["section"] == sec]
         sec_items.sort(key=lambda i: (-score(i), -i["ts"]))
         top = sec_items[:PER_SECTION]
@@ -319,16 +345,46 @@ a.n.hot{border-left:4px solid var(--hot)}
 .m{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--mut)}
 .src{color:var(--ac);font-weight:600}.tag{border:1px solid var(--bd);border-radius:6px;padding:0 6px}
 .empty{color:var(--mut);text-align:center;padding:30px 0}
+.alert{max-width:720px;margin:12px auto 0;padding:0 16px}
+.alert div{background:#fef3c7;color:#78350f;border:1px solid #f59e0b;border-radius:12px;padding:10px 14px;margin-bottom:6px;font-size:14px}
+.alert b{color:#b45309}
+h2{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;letter-spacing:.04em}
+.ev{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
+.ev.hi{border-left:4px solid var(--hot)}.ev.md{border-left:4px solid #f59e0b}
+.ev .h{min-width:48px;font-weight:700;font-variant-numeric:tabular-nums}
+.ev .x{font-size:12px;color:var(--mut);margin-top:2px}
+.mk{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 2px;max-width:720px;margin:auto}
+.mk div{flex:0 0 auto;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:6px 10px;min-width:104px}
+.mk small{display:block;color:var(--mut);font-size:11px;white-space:nowrap}
+.mk b{font-variant-numeric:tabular-nums}.up2{color:#16a34a}.dn{color:#dc2626}
+.hrs{max-width:720px;margin:8px auto 0;padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px}
+.hrs div{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 10px}
+.hrs small{color:var(--mut);display:block;font-size:11px}
+.on-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:#16a34a}.off-dot{background:#9ca3af}
 </style></head><body>
 <header><h1>📰 Noticias Económicas</h1>
 <div class="up">Actualizado __UPDATED__ (hora Chile) · se refresca sola cada 10 min</div>
-<nav><button data-s="chile" class="on">🇨🇱 Chile (__NC__)</button><button data-s="mundo">🌎 EE.UU. y mundo (__NM__)</button><button data-s="resultados">📊 Resultados Nasdaq (__NR__)</button></nav></header>
+<nav><button data-s="agenda" class="on">📅 Agenda</button><button data-s="chile">🇨🇱 Chile (__NC__)</button><button data-s="mundo">🌎 EE.UU. y mundo (__NM__)</button><button data-s="resultados">📊 Resultados (__NR__)</button><button data-s="ia">🤖 IA (__NI__)</button></nav></header>
+__MKT__
+<div class="hrs" id="hrs"></div>
+__ALERT__
 <main>__BODY__</main>
 <script>
 const b=document.querySelectorAll('nav button'),s=document.querySelectorAll('.sec');
 function show(k){b.forEach(x=>x.classList.toggle('on',x.dataset.s==k));s.forEach(x=>x.classList.toggle('on',x.id==k));try{localStorage.tab=k}catch(e){}}
 b.forEach(x=>x.onclick=()=>{show(x.dataset.s);scrollTo(0,0)});
 try{if(localStorage.tab)show(localStorage.tab)}catch(e){}
+/* Horarios de bolsa en vivo (calculados en tu celular, con zonas horarias reales) */
+const MK=[{n:'Nueva York (NYSE/Nasdaq)',tz:'America/New_York',o:[9,30],c:[16,0],f:'🇺🇸'},{n:'Londres (LSE)',tz:'Europe/London',o:[8,0],c:[16,30],f:'🇬🇧'}];
+function parts(tz,d){const p={};new Intl.DateTimeFormat('en-US',{timeZone:tz,hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).forEach(x=>p[x.type]=x.value);p.h=(+p.hour)%24;p.m=+p.minute;return p}
+function fmtCL(d){return new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit',hour12:false}).format(d)}
+function atLocal(tz,y,mo,da,h,mi){/* instante UTC para una hora local de la plaza */let g=new Date(Date.UTC(y,mo-1,da,h,mi));for(let i=0;i<2;i++){const p=parts(tz,g);const dif=(Date.UTC(y,mo-1,da,h,mi)-Date.UTC(+p.year,+p.month-1,+p.day,p.h,p.m));g=new Date(g.getTime()+dif)}return g}
+function hrs(){const now=new Date();let out='';MK.forEach(m=>{const p=parts(m.tz,now),wd=!['Sat','Sun'].includes(p.weekday),mins=p.h*60+p.m,o=m.o[0]*60+m.o[1],c=m.c[0]*60+m.c[1],open=wd&&mins>=o&&mins<c;
+const op=atLocal(m.tz,+p.year,+p.month,+p.day,m.o[0],m.o[1]),cl=atLocal(m.tz,+p.year,+p.month,+p.day,m.c[0],m.c[1]);
+let est;if(open){const r=Math.round((cl-now)/60000);est='cierra en '+Math.floor(r/60)+' h '+r%60+' min'}else if(wd&&mins<o){const r=Math.round((op-now)/60000);est='abre en '+Math.floor(r/60)+' h '+r%60+' min'}else est='abre el próximo día hábil';
+out+='<div><small>'+m.f+' '+m.n+'</small><span class="on-dot'+(open?'':' off-dot')+'"></span><b>'+(open?'ABIERTO':'CERRADO')+'</b> · '+est+'<small>Allá son las '+String(p.h).padStart(2,'0')+':'+String(p.m).padStart(2,'0')+' · Horario en Chile: '+fmtCL(op)+' a '+fmtCL(cl)+'</small></div>'});
+document.getElementById('hrs').innerHTML=out}
+hrs();setInterval(hrs,30000);
 </script></body></html>"""
 
 
@@ -341,10 +397,81 @@ def ago(ts):
     return f"hace {mins//1440} d"
 
 
-def render(items):
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def fecha_es(d):
+    return f"{DIAS[d.weekday()]} {d.day} {MESES[d.month - 1]}"
+
+
+def render_markets(mk):
+    if not mk:
+        return ""
+    chips = []
+    for q in mk:
+        up = q["pct"] >= 0
+        price = f'{q["price"]:,.{q["dec"]}f}'.replace(",", "X").replace(".", ",").replace("X", ".")
+        chips.append(f'<div><small>{html.escape(q["name"])}</small><b>{price}</b> '
+                     f'<span class="{"up2" if up else "dn"}">{"▲" if up else "▼"} {abs(q["pct"]):.2f}%</span></div>')
+    return '<div class="mk">' + "".join(chips) + "</div>"
+
+
+def render_agenda(ag):
+    e = html.escape
+    now = datetime.now(TZ_CL)
+    today = now.date()
+    alerts, parts = [], []
+    # --- eventos macro, agrupados por día (hora Chile) ---
+    days = {}
+    for ev in ag.get("events", []):
+        d = datetime.fromtimestamp(ev["ts"], TZ_CL)
+        days.setdefault(d.date(), []).append((d, ev))
+        mins = (ev["ts"] - time.time()) / 60
+        if ev["impact"] == "High" and 0 < mins <= 24 * 60:
+            alerts.append(f'🔴 <b>{e(ev["flag"])} {e(ev["title_es"])}</b> · {"hoy" if d.date() == today else "mañana"} {d:%H:%M}')
+    parts.append("<h2>📅 Calendario económico (hora de Chile)</h2>")
+    for day in sorted(days):
+        parts.append(f"<h2>{fecha_es(day)}</h2>")
+        for d, ev in days[day]:
+            cls = "hi" if ev["impact"] == "High" else "md"
+            extra = " · ".join(x for x in (f'Previsto: {ev["forecast"]}' if ev["forecast"] else "",
+                                           f'Anterior: {ev["previous"]}' if ev["previous"] else "") if x)
+            parts.append(f'<div class="ev {cls}"><div class="h">{d:%H:%M}</div><div><div class="t">{e(ev["flag"])} '
+                         f'{e(ev["title_es"])}</div><div class="x">{"Impacto alto" if cls == "hi" else "Impacto medio"} · '
+                         f'{e(ev["country"])}{(" · " + e(extra)) if extra else ""}</div></div></div>')
+    if not days:
+        parts.append('<div class="empty">Sin eventos próximos.</div>')
+    # --- resultados de grandes empresas ---
+    parts.append("<h2>📊 Entrega de resultados · grandes empresas</h2>")
+    by = {}
+    for q in ag.get("earnings", []):
+        by.setdefault(q["date"], []).append(q)
+    for ds in sorted(by):
+        day = datetime.fromisoformat(ds).date()
+        parts.append(f"<h2>{fecha_es(day)}</h2>")
+        for q in by[ds][:14]:
+            cap = f'US$ {q["cap"] / 1e9:,.0f} mil millones'.replace(",", ".") if q["cap"] else ""
+            eps = f' · BPA esperado {e(q["eps"])}' if q.get("eps") else ""
+            star = "⭐ " if q.get("watch") else ""
+            parts.append(f'<div class="ev md"><div class="h">{e(q["symbol"])}</div><div><div class="t">{star}{e(q["name"])}</div>'
+                         f'<div class="x">{e(q["session"])}{eps} · {cap}</div></div></div>')
+        if day - today <= timedelta(days=1):
+            names = ", ".join(q["symbol"] for q in by[ds] if q.get("watch"))[:80]
+            if names:
+                alerts.append(f'📊 <b>Resultados {"hoy" if day == today else "mañana"}:</b> {e(names)}')
+    if not by:
+        parts.append('<div class="empty">Sin resultados programados.</div>')
+    alert_html = ('<div class="alert">' + "".join(f"<div>{a}</div>" for a in alerts[:6]) + "</div>") if alerts else ""
+    return '<section class="sec on" id="agenda">' + "".join(parts) + "</section>", alert_html
+
+
+def render(items, agenda):
     body = []
     counts = {}
-    for sec in ("chile", "mundo", "resultados"):
+    ag_html, alert_html = render_agenda(agenda)
+    body.append(ag_html)
+    for sec in ("chile", "mundo", "resultados", "ia"):
         its = [i for i in items if i["section"] == sec]
         counts[sec] = len(its)
         cards = []
@@ -357,22 +484,25 @@ def render(items):
                 f'<div class="t">{e(i["title_es"])}</div>{summ}'
                 f'<div class="m"><span class="src">{e(i["source"])}</span><span>{ago(i["ts"])}</span>{tag}</div></a>'
             )
-        body.append(f'<section class="sec{" on" if sec == "chile" else ""}" id="{sec}">'
+        body.append(f'<section class="sec" id="{sec}">'
                     + ("".join(cards) or '<div class="empty">Sin noticias nuevas por ahora.</div>') + "</section>")
     now = datetime.now(TZ_CL).strftime("%d-%m %H:%M")
     return (PAGE.replace("__UPDATED__", now).replace("__BODY__", "\n".join(body))
             .replace("__NC__", str(counts["chile"])).replace("__NM__", str(counts["mundo"]))
-            .replace("__NR__", str(counts["resultados"])))
+            .replace("__NR__", str(counts["resultados"])).replace("__NI__", str(counts["ia"]))
+            .replace("__ALERT__", alert_html).replace("__MKT__", render_markets(agenda.get("markets", []))))
 
 
 def run_once():
     print(datetime.now().strftime("[%H:%M:%S] actualizando..."))
     items = collect()
     translate(items)
+    ag = agenda.build(lambda ts: _batch(ts))
+    ag["notified"] = agenda.notify(ag, previous_notified())
     OUT.mkdir(exist_ok=True)
     (OUT / "news.json").write_text(
-        json.dumps({"generated": time.time(), "items": items}, ensure_ascii=False), encoding="utf-8")
-    (OUT / "index.html").write_text(render(items), encoding="utf-8")
+        json.dumps({"generated": time.time(), "items": items, "agenda": ag}, ensure_ascii=False), encoding="utf-8")
+    (OUT / "index.html").write_text(render(items, ag), encoding="utf-8")
     (OUT / "manifest.json").write_text(json.dumps({
         "name": "Noticias Económicas", "short_name": "Noticias", "start_url": "./",
         "display": "standalone", "background_color": "#0b1220", "theme_color": "#0b1220",
