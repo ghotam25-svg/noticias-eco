@@ -23,7 +23,7 @@ from pathlib import Path
 
 import feedparser
 import requests
-from deep_translator import GoogleTranslator
+from deep_translator import GoogleTranslator, MyMemoryTranslator
 
 OUT = Path(__file__).parent / "docs"
 UA = {"User-Agent": "Mozilla/5.0 (compatible; NoticiasEco/1.0)"}
@@ -179,7 +179,7 @@ def load_cache():
     for p in paths:
         try:
             for it in json.loads(p.read_text(encoding="utf-8"))["items"]:
-                if it.get("title_es"):
+                if it.get("title_es") and not it.get("failed"):
                     cache[it["title"]] = (it["title_es"], it.get("summary_es", ""))
         except Exception:
             pass
@@ -187,41 +187,76 @@ def load_cache():
     if url and not cache:
         try:
             for it in requests.get(url, timeout=15).json()["items"]:
-                if it.get("title_es"):
+                if it.get("title_es") and not it.get("failed"):
                     cache[it["title"]] = (it["title_es"], it.get("summary_es", ""))
         except Exception:
             pass
     return cache
 
 
+SEP = chr(10) + "§§" + chr(10)
+
+
+def _gtx(text):
+    """Endpoint público de Google Translate (distinto al que usa deep_translator)."""
+    r = requests.get(
+        "https://translate.googleapis.com/translate_a/single",
+        params={"client": "gtx", "sl": "auto", "tl": "es", "dt": "t", "q": text},
+        headers=UA, timeout=25)
+    r.raise_for_status()
+    return "".join(seg[0] for seg in r.json()[0] if seg[0])
+
+
+def _single(text):
+    """Un texto: prueba varios motores; devuelve None si todos fallan."""
+    for fn in (
+        _gtx,
+        lambda t: GoogleTranslator(source="auto", target="es").translate(t),
+        lambda t: MyMemoryTranslator(source="en-US", target="es-ES").translate(t),
+    ):
+        try:
+            out = fn(text)
+            if out and out.strip():
+                return out
+        except Exception as ex:
+            print("  ! traducción:", type(ex).__name__, str(ex)[:80], file=sys.stderr)
+        time.sleep(0.5)
+    return None
+
+
+def _batch(texts):
+    """Traduce una lista en una sola llamada; si algo no cuadra, uno por uno."""
+    try:
+        out = _gtx(SEP.join(texts)).split("§§")
+        out = [o.strip() for o in out]
+        if len(out) == len(texts) and all(out):
+            return out
+    except Exception as ex:
+        print("  ! lote:", type(ex).__name__, str(ex)[:80], file=sys.stderr)
+    return [_single(t) for t in texts]
+
+
 def translate(items):
     cache = load_cache()
-
-    def do(text):
-        for _ in range(3):
-            try:
-                return GoogleTranslator(source="auto", target="es").translate(text)
-            except Exception:
-                time.sleep(1.5)
-        return text  # si falla, se deja en inglés antes que perder la noticia
-
     todo = []
     for it in items:
         if it["lang"] != "en":
             it["title_es"], it["summary_es"] = it["title"], it["summary"]
-        elif it["title"] in cache:
+        elif it["title"] in cache and cache[it["title"]][0] != it["title"]:
             it["title_es"], it["summary_es"] = cache[it["title"]]
         else:
             todo.append(it)
-
-    def work(it):
-        it["title_es"] = do(it["title"])
-        it["summary_es"] = do(it["summary"]) if it["summary"] else ""
-
-    with ThreadPoolExecutor(8) as ex:
-        list(ex.map(work, todo))
-    n = len(todo)
-    print(f"  traducidas nuevas: {n}")
+    ok = 0
+    for i in range(0, len(todo), 12):
+        chunk = todo[i:i + 12]
+        titles = _batch([c["title"] for c in chunk])
+        sums = _batch([c["summary"] or "-" for c in chunk])
+        for c, t, sm in zip(chunk, titles, sums):
+            c["title_es"] = t or c["title"]
+            c["summary_es"] = "" if not c["summary"] else (sm or "")
+            c["failed"] = t is None
+            ok += t is not None
+    print(f"  traducidas nuevas: {ok}/{len(todo)}")
 
 
 def score(it):
