@@ -251,6 +251,15 @@ def _single(text):
     return None
 
 
+def _mymemory(text):
+    try:
+        out = MyMemoryTranslator(source="en-US", target="es-ES").translate(text[:480])
+        return out if out and out.strip() and "MYMEMORY WARNING" not in out else None
+    except Exception as ex:
+        print("  ! mymemory:", type(ex).__name__, str(ex)[:60], file=sys.stderr)
+        return None
+
+
 class _Limitado(Exception):
     pass
 
@@ -284,7 +293,8 @@ def _batch(texts):
             print("  ! lote:", type(ex).__name__, str(ex)[:80], file=sys.stderr)
             break
     else:
-        return [None] * len(texts)  # sigue limitado: no insistir; se reintenta en la próxima pasada
+        # Google sigue limitando: probar otro proveedor (MyMemory) de a uno, con tope de caracteres
+        return [_mymemory(t) for t in texts]
     return [_single(t) for t in texts]
 
 
@@ -478,7 +488,7 @@ def render(items, agenda):
     ag_html, alert_html = render_agenda(agenda)
     body.append(ag_html)
     for sec in ("chile", "mundo", "resultados", "ia", "traders"):
-        its = [i for i in items if i["section"] == sec]
+        its = [i for i in items if i["section"] == sec and not (i["lang"] == "en" and (i.get("failed") or i["title_es"] == i["title"]))]
         counts[sec] = len(its)
         cards = []
         for i in its:

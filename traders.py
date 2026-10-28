@@ -127,7 +127,7 @@ def sentiment(translate_batch):
         i = 0
         for s in st:
             for m in s["msgs"]:
-                m["text_es"] = tr[i] or m["text"]
+                m["text_es"] = tr[i]  # None si no se pudo traducir: no se muestra en inglés
                 i += 1
     print(f"  sentimiento traders: {len(st)} símbolos, {sum(s['n'] for s in st)} mensajes")
     return {"fng": fear_greed(), "stocktwits": st, "trending": trending()}
@@ -200,8 +200,8 @@ def render(sn, news_items):
                 line = f'<b>{pb}% alcista</b> · {100 - pb}% bajista — {verdict} <span class="x">({tot} opinan de {x["n"]} mensajes)</span>'
             else:
                 bar, line = "", "Sin opiniones etiquetadas en la muestra"
-            msgs = "".join(f'<div class="q">{"🟢" if m["side"] == "alcista" else "🔴"} “{e(m.get("text_es", m["text"]))[:200]}” — @{e(m["user"])}</div>'
-                           for m in x["msgs"])
+            msgs = "".join(f'<div class="q">{"🟢" if m["side"] == "alcista" else "🔴"} “{e(m["text_es"])[:200]}” — @{e(m["user"])}</div>'
+                           for m in x["msgs"] if m.get("text_es"))
             out.append(f'<div class="st"><div class="t">{e(x["name"])} <small style="color:var(--mut)">({e(x["symbol"])})</small></div>{bar}'
                        f'<div class="x" style="color:var(--tx)">{line}</div>{msgs}</div>')
         out.append('<div class="x" style="margin-bottom:8px">Solo cuentan los mensajes que el autor etiquetó como alcista o bajista '
