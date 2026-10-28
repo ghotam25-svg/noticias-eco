@@ -1,5 +1,5 @@
 /* Trading News: caché para abrir sin conexión; siempre intenta primero la red (datos frescos). */
-const V = 'tn-v2';
+const V = 'tn-v3';
 const BASE = ['./', 'icon-192.png', 'icon-512.png', 'favicon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(BASE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

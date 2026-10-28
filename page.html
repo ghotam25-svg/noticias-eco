@@ -81,13 +81,15 @@ a.n.hot::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4
 .tip{max-width:720px;margin:12px auto 0;padding:0 16px;font-size:13px}
 .tip div{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:11px 14px;box-shadow:var(--sh)}
 /* horarios de bolsa */
-.hrs{max-width:720px;margin:12px auto 0;padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.mkt{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:10px 12px;box-shadow:var(--sh);display:flex;gap:10px;align-items:flex-start}
+.hrs{max-width:720px;margin:12px auto 0;padding:2px 16px 8px;display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}
+.hrs::-webkit-scrollbar{display:none}
+.mkt{flex:0 0 min(46%,190px);scroll-snap-align:start;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:10px 12px;box-shadow:var(--sh);display:flex;gap:10px;align-items:flex-start}
 .mkt .fl{font-size:20px;line-height:1}
 .mkt b{font-size:12.5px;letter-spacing:.01em}.mkt .st2{font-size:12px;color:var(--mut)}
 .mkt small{display:block;color:var(--mut);font-size:10.5px;margin-top:3px;line-height:1.3}
 .pill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;border-radius:999px;padding:1px 8px;margin-right:4px}
 .pill.on{background:color-mix(in srgb,var(--up) 18%,transparent);color:var(--up)}.pill.off{background:var(--bd);color:var(--mut)}
+.pill.lunch{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
 /* eventos y resultados */
 .ev{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:11px 14px;margin-bottom:9px;display:flex;gap:12px;align-items:flex-start;box-shadow:var(--sh);position:relative}
 .ev.hi::before,.ev.md::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 4px 4px 0}
@@ -100,6 +102,9 @@ a.n.hot::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4
 .bar{height:10px;border-radius:6px;background:linear-gradient(90deg,#e11d48,#f59e0b,#16a34a);position:relative;margin:12px 0}
 .bar i{position:absolute;top:-5px;width:6px;height:20px;background:var(--tx);border-radius:3px;transform:translateX(-3px);box-shadow:0 0 0 3px var(--card)}
 .sb{display:flex;height:8px;border-radius:5px;overflow:hidden;margin:8px 0;background:var(--bd);gap:2px}.sb u{background:var(--up);border-radius:4px}.sb s{background:var(--dn);border-radius:4px}
+.fpg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.fp{background:var(--card2);border:1px solid var(--bd);border-radius:12px;padding:6px 10px;display:flex;flex-direction:column;font-size:12px}
+.fp span{color:var(--mut)}.fp b{font-size:15px}.fp small{color:var(--mut);font-size:10.5px}
 .q{font-size:12.5px;color:var(--mut);margin-top:6px}
 /* navegación inferior */
 nav{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(560px,calc(100% - 20px));
@@ -138,14 +143,24 @@ function show(k){b.forEach(x=>x.classList.toggle('on',x.dataset.s==k));s.forEach
 b.forEach(x=>x.onclick=()=>{show(x.dataset.s);scrollTo({top:0,behavior:'smooth'})});
 try{if(localStorage.tab&&document.getElementById(localStorage.tab))show(localStorage.tab);else show('agenda')}catch(e){show('agenda')}
 /* Horarios de bolsa en vivo (calculados en tu celular, con zonas horarias reales) */
-const MK=[{n:'Nueva York',tz:'America/New_York',o:[9,30],c:[16,0],f:'🇺🇸'},{n:'Londres',tz:'Europe/London',o:[8,0],c:[16,30],f:'🇬🇧'}];
+/* s = sesiones [hora_ini,min_ini,hora_fin,min_fin] en hora local de la bolsa (con receso de almuerzo en Asia); no considera feriados */
+const MK=[
+{n:'Tokio',tz:'Asia/Tokyo',s:[[9,0,11,30],[12,30,15,30]],f:'🇯🇵'},
+{n:'Shanghái',tz:'Asia/Shanghai',s:[[9,30,11,30],[13,0,15,0]],f:'🇨🇳'},
+{n:'Hong Kong',tz:'Asia/Hong_Kong',s:[[9,30,12,0],[13,0,16,0]],f:'🇭🇰'},
+{n:'Londres',tz:'Europe/London',s:[[8,0,16,30]],f:'🇬🇧'},
+{n:'Nueva York',tz:'America/New_York',s:[[9,30,16,0]],f:'🇺🇸'}];
 function parts(tz,d){const p={};new Intl.DateTimeFormat('en-US',{timeZone:tz,hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).forEach(x=>p[x.type]=x.value);p.h=(+p.hour)%24;p.m=+p.minute;return p}
 function fmtCL(d){return new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit',hour12:false}).format(d)}
 function atLocal(tz,y,mo,da,h,mi){/* instante UTC para una hora local de la plaza */let g=new Date(Date.UTC(y,mo-1,da,h,mi));for(let i=0;i<2;i++){const p=parts(tz,g);const dif=(Date.UTC(y,mo-1,da,h,mi)-Date.UTC(+p.year,+p.month-1,+p.day,p.h,p.m));g=new Date(g.getTime()+dif)}return g}
-function hrs(){const now=new Date();let out='';MK.forEach(m=>{const p=parts(m.tz,now),wd=!['Sat','Sun'].includes(p.weekday),mins=p.h*60+p.m,o=m.o[0]*60+m.o[1],c=m.c[0]*60+m.c[1],open=wd&&mins>=o&&mins<c;
-const op=atLocal(m.tz,+p.year,+p.month,+p.day,m.o[0],m.o[1]),cl=atLocal(m.tz,+p.year,+p.month,+p.day,m.c[0],m.c[1]);
-let est;if(open){const r=Math.round((cl-now)/60000);est='cierra en '+Math.floor(r/60)+' h '+r%60+' min'}else if(wd&&mins<o){const r=Math.round((op-now)/60000);est='abre en '+Math.floor(r/60)+' h '+r%60+' min'}else est='abre próximo día hábil';
-out+='<div class="mkt"><span class="fl">'+m.f+'</span><div><b>'+m.n+'</b> <span class="pill '+(open?'on':'off')+'">'+(open?'ABIERTO':'CERRADO')+'</span><div class="st2">'+est+'</div><small>Allá '+String(p.h).padStart(2,'0')+':'+String(p.m).padStart(2,'0')+' · En Chile '+fmtCL(op)+'–'+fmtCL(cl)+'</small></div></div>'});
+function dur(r){return Math.floor(r/60)+' h '+String(r%60).padStart(2,'0')+' min'}
+function hrs(){const now=new Date();let out='';MK.forEach(m=>{const p=parts(m.tz,now),wd=!['Sat','Sun'].includes(p.weekday),mins=p.h*60+p.m,S=m.s.map(x=>[x[0]*60+x[1],x[2]*60+x[3]]),last=S.length-1;
+const idx=wd?S.findIndex(x=>mins>=x[0]&&mins<x[1]):-1;let state='off',lab='CERRADO',est='abre próximo día hábil';
+if(idx>=0){state='on';lab='ABIERTO';est=idx<last?'receso en '+dur(S[idx][1]-mins):'cierra en '+dur(S[idx][1]-mins)}
+else if(wd&&mins<S[0][0]){est='abre en '+dur(S[0][0]-mins)}
+else if(wd&&mins<S[last][0]){state='lunch';lab='RECESO';est='reabre en '+dur(S.find(x=>x[0]>mins)[0]-mins)}
+const op=atLocal(m.tz,+p.year,+p.month,+p.day,m.s[0][0],m.s[0][1]),cl=atLocal(m.tz,+p.year,+p.month,+p.day,m.s[last][2],m.s[last][3]);
+out+='<div class="mkt"><span class="fl">'+m.f+'</span><div><b>'+m.n+'</b> <span class="pill '+state+'">'+lab+'</span><div class="st2">'+est+'</div><small>Allá '+String(p.h).padStart(2,'0')+':'+String(p.m).padStart(2,'0')+' · En Chile '+fmtCL(op)+'–'+fmtCL(cl)+'</small></div></div>'});
 document.getElementById('hrs').innerHTML=out}
 hrs();setInterval(hrs,30000);
 /* Instalación como app */

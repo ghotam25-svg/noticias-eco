@@ -155,7 +155,8 @@ def earnings(days=10):
 MARKETS = [
     ("US100 · Nasdaq 100", "NQ=F", 1), ("S&P 500", "^GSPC", 1), ("Oro", "GC=F", 1), ("Bitcoin", "BTC-USD", 0),
     ("Dólar/CLP", "USDCLP=X", 1), ("Cobre", "HG=F", 2), ("Petróleo WTI", "CL=F", 2), ("VIX", "^VIX", 2),
-    ("Índice dólar", "DX-Y.NYB", 2),
+    ("Índice dólar", "DX-Y.NYB", 2), ("Nikkei 225", "^N225", 0), ("Hang Seng", "^HSI", 0),
+    ("Shanghái", "000001.SS", 0),
 ]
 
 

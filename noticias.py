@@ -251,15 +251,40 @@ def _single(text):
     return None
 
 
+class _Limitado(Exception):
+    pass
+
+
+def _gtx_chk(text):
+    r = requests.get(
+        "https://translate.googleapis.com/translate_a/single",
+        params={"client": "gtx", "sl": "auto", "tl": "es", "dt": "t", "q": text},
+        headers=UA, timeout=25)
+    if r.status_code == 429:
+        raise _Limitado()
+    r.raise_for_status()
+    return "".join(seg[0] for seg in r.json()[0] if seg[0])
+
+
 def _batch(texts):
-    """Traduce una lista en una sola llamada; si algo no cuadra, uno por uno."""
-    try:
-        out = _gtx(SEP.join(texts)).split("§§")
-        out = [o.strip() for o in out]
-        if len(out) == len(texts) and all(out):
-            return out
-    except Exception as ex:
-        print("  ! lote:", type(ex).__name__, str(ex)[:80], file=sys.stderr)
+    """Traduce una lista en una sola llamada. Si Google limita (429) espera y reintenta el lote completo;
+    solo si el lote vuelve desalineado se traduce de a uno."""
+    if not texts:
+        return []
+    for espera in (0, 15, 40):
+        time.sleep(espera)
+        try:
+            out = [o.strip() for o in _gtx_chk(SEP.join(texts)).split("§§")]
+            if len(out) == len(texts) and all(out):
+                return out
+            break  # lote desalineado: pasar a modo individual
+        except _Limitado:
+            print("  ! traducción limitada (429), espero y reintento", file=sys.stderr)
+        except Exception as ex:
+            print("  ! lote:", type(ex).__name__, str(ex)[:80], file=sys.stderr)
+            break
+    else:
+        return [None] * len(texts)  # sigue limitado: no insistir; se reintenta en la próxima pasada
     return [_single(t) for t in texts]
 
 
@@ -274,8 +299,8 @@ def translate(items):
         else:
             todo.append(it)
     ok = 0
-    for i in range(0, len(todo), 12):
-        chunk = todo[i:i + 12]
+    for i in range(0, len(todo), 8):
+        chunk = todo[i:i + 8]
         titles = _batch([c["title"] for c in chunk])
         sums = _batch([c["summary"] or "-" for c in chunk])
         for c, t, sm in zip(chunk, titles, sums):
@@ -356,6 +381,7 @@ def collect():
         for i in top:
             i["hot"] = score(i) >= 2
             i["stance"] = traders.stance(i["title"] + " " + i["summary"]) if sec == "traders" else ""
+            i["action"] = traders.action(i["title"] + " " + i["summary"]) if sec == "traders" else ""
         final += top
     return final
 
@@ -391,35 +417,6 @@ def render_markets(mk):
                      f'<span class="{"up2" if up else "dn"}">{"▲" if up else "▼"} {abs(q["pct"]):.2f}%</span></span>')
     row = "".join(chips)
     return f'<div class="tk" aria-label="Indicadores de mercado"><div class="tk-in">{row}{row}</div></div>'
-
-
-def render_sentiment(sn):
-    e = html.escape
-    out = ['<div class="warn">⚠️ Son opiniones de terceros (analistas y usuarios de StockTwits), no recomendaciones de inversión. '
-           'Pueden estar equivocadas; decide con tu propio análisis.</div>']
-    f = sn.get("fng")
-    if f:
-        out.append(f'<div class="fg"><div class="t">Índice Miedo y Codicia (CNN): <b>{f["score"]}/100 · {e(f["rating"])}</b></div>'
-                   f'<div class="bar"><i style="left:{f["score"]}%"></i></div>'
-                   f'<div class="x">Ayer: {f["prev"]} · Hace 1 semana: {f["week"]} · 0 = miedo extremo · 100 = codicia extrema</div></div>')
-    if sn.get("stocktwits"):
-        out.append("<h2>💬 Qué dicen los traders en StockTwits</h2>")
-        for x in sn["stocktwits"]:
-            tot = x["bull"] + x["bear"]
-            if tot:
-                pb = round(x["bull"] / tot * 100)
-                verdict = "mayoría alcista 🟢" if pb >= 60 else ("mayoría bajista 🔴" if pb <= 40 else "dividido ⚪")
-                bar = f'<div class="sb"><u style="width:{pb}%"></u><s style="width:{100 - pb}%"></s></div>'
-                line = f'{pb}% alcista · {100 - pb}% bajista ({tot} opinan de {x["n"]} mensajes) — {verdict}'
-            else:
-                bar, line = "", "Sin opiniones etiquetadas en la muestra"
-            msgs = "".join(f'<div class="q">{"🟢" if m["side"] == "alcista" else "🔴"} “{e(m.get("text_es", m["text"]))[:220]}” — @{e(m["user"])}</div>'
-                           for m in x["msgs"])
-            out.append(f'<div class="st"><div class="t">{e(x["name"])} <small style="color:var(--mut)">({e(x["symbol"])})</small></div>{bar}'
-                       f'<div class="x">{line}</div>{msgs}</div>')
-        out.append('<div class="x" style="margin-bottom:8px">Muestra pequeña: últimos ~30 mensajes por activo; sirve como termómetro, no como señal.</div>')
-    out.append("<h2>📰 Análisis y calificaciones de analistas</h2>")
-    return "".join(out)
 
 
 def render_agenda(ag):
@@ -490,12 +487,14 @@ def render(items, agenda):
             tag = '<span class="tag">traducido del inglés</span>' if i["lang"] == "en" else ""
             tag += {"alcista": '<span class="tag bu">🟢 Tono alcista</span>', "bajista": '<span class="tag be">🔴 Tono bajista</span>',
                     "neutral": '<span class="tag">⚪ Neutral</span>'}.get(i.get("stance", ""), "")
+            tag += {"mejora": '<span class="tag bu">⬆️ Mejora de analista</span>',
+                    "rebaja": '<span class="tag be">⬇️ Rebaja de analista</span>'}.get(i.get("action", ""), "")
             cards.append(
                 f'<a class="n{" hot" if i.get("hot") else ""}" href="{e(i["link"])}" target="_blank" rel="noopener">'
                 f'<div class="t">{e(i["title_es"])}</div>{summ}'
                 f'<div class="m"><span class="src">{e(i["source"])}</span><span>{ago(i["ts"])}</span>{tag}</div></a>'
             )
-        body.append(f'<section class="sec" id="{sec}">' + (render_sentiment(agenda.get("sentiment", {})) if sec == "traders" else "")
+        body.append(f'<section class="sec" id="{sec}">' + (traders.render(agenda.get("sentiment", {}), its) if sec == "traders" else "")
                     + ("".join(cards) or '<div class="empty">Sin noticias nuevas por ahora.</div>') + "</section>")
     now = datetime.now(TZ_CL).strftime("%d-%m %H:%M")
     return (PAGE.replace("__UPDATED__", now).replace("__BODY__", "\n".join(body))
