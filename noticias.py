@@ -275,27 +275,37 @@ def _gtx_chk(text):
     return "".join(seg[0] for seg in r.json()[0] if seg[0])
 
 
+_ESTADO = {"google_limitado": False, "mm_restantes": 60}
+
+
 def _batch(texts):
-    """Traduce una lista en una sola llamada. Si Google limita (429) espera y reintenta el lote completo;
-    solo si el lote vuelve desalineado se traduce de a uno."""
+    """Traduce una lista. Si Google limita (429) espera UNA vez; si sigue limitando, se desactiva Google
+    por el resto de la pasada y se usa MyMemory (con tope) para que la ejecución nunca se atasque."""
     if not texts:
         return []
-    for espera in (0, 15, 40):
-        time.sleep(espera)
-        try:
-            out = [o.strip() for o in _gtx_chk(SEP.join(texts)).split("§§")]
-            if len(out) == len(texts) and all(out):
-                return out
-            break  # lote desalineado: pasar a modo individual
-        except _Limitado:
-            print("  ! traducción limitada (429), espero y reintento", file=sys.stderr)
-        except Exception as ex:
-            print("  ! lote:", type(ex).__name__, str(ex)[:80], file=sys.stderr)
-            break
-    else:
-        # Google sigue limitando: probar otro proveedor (MyMemory) de a uno, con tope de caracteres
-        return [_mymemory(t) for t in texts]
-    return [_single(t) for t in texts]
+    if not _ESTADO["google_limitado"]:
+        for espera in (0, 12):
+            time.sleep(espera)
+            try:
+                out = [o.strip() for o in _gtx_chk(SEP.join(texts)).split("§§")]
+                if len(out) == len(texts) and all(out):
+                    return out
+                return [_single(t) for t in texts]  # lote desalineado
+            except _Limitado:
+                print("  ! traducción limitada (429)", file=sys.stderr)
+            except Exception as ex:
+                print("  ! lote:", type(ex).__name__, str(ex)[:80], file=sys.stderr)
+                return [_single(t) for t in texts]
+        _ESTADO["google_limitado"] = True
+        print("  ! Google sigue limitando: uso MyMemory en esta pasada", file=sys.stderr)
+    res = []
+    for t in texts:
+        if _ESTADO["mm_restantes"] <= 0:
+            res.append(None)  # sin cupo: se traduce en la próxima pasada (mientras tanto no se muestra en inglés)
+            continue
+        _ESTADO["mm_restantes"] -= 1
+        res.append(_mymemory(t))
+    return res
 
 
 def translate(items):
