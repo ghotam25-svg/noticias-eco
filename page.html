@@ -117,15 +117,28 @@ nav button.on{color:var(--tx);background:color-mix(in srgb,var(--ac) 16%,transpa
 nav button.on .ic{filter:none;transform:translateY(-1px) scale(1.08)}
 nav button em{position:absolute;top:2px;right:calc(50% - 22px);font-style:normal;font-size:9px;font-weight:800;min-width:16px;height:16px;line-height:16px;text-align:center;
   border-radius:999px;background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;padding:0 4px}
+#rf{border:1px solid var(--bd);background:var(--card);border-radius:999px;width:36px;height:36px;font-size:15px;color:var(--tx)}
+#rf.spin{animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+#stale div{background:color-mix(in srgb,var(--dn) 14%,var(--card));border-color:color-mix(in srgb,var(--dn) 45%,var(--bd))}
+#nextev div{background:linear-gradient(135deg,color-mix(in srgb,var(--ac) 18%,var(--card)),color-mix(in srgb,var(--ac2) 12%,var(--card)));border-color:color-mix(in srgb,var(--ac) 40%,var(--bd))}
+.srch{width:100%;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:14px;padding:11px 14px;font:inherit;font-size:14px;margin:0 0 12px;outline:none}
+.srch:focus{border-color:var(--ac)}
+.flt{display:flex;gap:8px;margin:0 0 12px}.flt .srch{margin:0}
+.flt button{flex:0 0 auto;border:1px solid var(--bd);background:var(--card);color:var(--mut);border-radius:14px;padding:0 12px;font:inherit;font-size:13px;font-weight:650}
+.flt button.on{background:color-mix(in srgb,var(--dn) 14%,var(--card));color:var(--dn);border-color:color-mix(in srgb,var(--dn) 45%,var(--bd))}
+a.n.fresh::after{content:"NUEVO";position:absolute;top:12px;right:14px;font-size:9px;font-weight:800;letter-spacing:.06em;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:999px;padding:2px 7px}
+.pill.early{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
 @media(min-width:900px){body{font-size:16px}}
 </style></head><body>
 <header>
 <div class="hd"><img class="logo" src="icon-192.png" alt="" width="34" height="34">
 <div><h1>Trading News</h1><div class="live"><i></i>Actualizado __UPDATED__ · hora Chile</div></div>
-<span class="sp"></span><button id="inst" hidden>📲 Instalar</button></div>
+<span class="sp"></span><button id="inst" hidden>📲 Instalar</button><button id="rf" aria-label="Recargar" title="Recargar">🔄</button></div>
 __MKT__
 </header>
 <div class="tip" id="tip" hidden><div>📲 Para instalar en iPhone: toca <b>Compartir</b> ⬆️ y luego <b>Agregar a pantalla de inicio</b>.</div></div>
+<div class="alert" id="stale" hidden><div></div></div>
+<div class="alert" id="nextev" hidden><div></div></div>
 <div class="hrs" id="hrs"></div>
 __ALERT__
 <main>__BODY__</main>
@@ -143,24 +156,29 @@ function show(k){b.forEach(x=>x.classList.toggle('on',x.dataset.s==k));s.forEach
 b.forEach(x=>x.onclick=()=>{show(x.dataset.s);scrollTo({top:0,behavior:'smooth'})});
 try{if(localStorage.tab&&document.getElementById(localStorage.tab))show(localStorage.tab);else show('agenda')}catch(e){show('agenda')}
 /* Horarios de bolsa en vivo (calculados en tu celular, con zonas horarias reales) */
-/* s = sesiones [hora_ini,min_ini,hora_fin,min_fin] en hora local de la bolsa (con receso de almuerzo en Asia); no considera feriados */
+/* s = sesiones [hora_ini,min_ini,hora_fin,min_fin] en hora local de la bolsa (con receso de almuerzo en Asia).
+   h = feriados principales (hasta ene-2027); e = cierres anticipados [hora,min]. Revisa feriados menores en la web de cada bolsa. */
 const MK=[
-{n:'Tokio',tz:'Asia/Tokyo',s:[[9,0,11,30],[12,30,15,30]],f:'🇯🇵'},
-{n:'Shanghái',tz:'Asia/Shanghai',s:[[9,30,11,30],[13,0,15,0]],f:'🇨🇳'},
-{n:'Hong Kong',tz:'Asia/Hong_Kong',s:[[9,30,12,0],[13,0,16,0]],f:'🇭🇰'},
-{n:'Londres',tz:'Europe/London',s:[[8,0,16,30]],f:'🇬🇧'},
-{n:'Nueva York',tz:'America/New_York',s:[[9,30,16,0]],f:'🇺🇸'}];
+{n:'Tokio',tz:'Asia/Tokyo',s:[[9,0,11,30],[12,30,15,30]],f:'🇯🇵',h:{'2026-11-03':'Día de la Cultura','2026-11-23':'Acción de Gracias laboral','2026-12-31':'Fin de año','2027-01-01':'Año Nuevo','2027-01-04':'Receso de año nuevo','2027-01-11':'Mayoría de edad'}},
+{n:'Shanghái',tz:'Asia/Shanghai',s:[[9,30,11,30],[13,0,15,0]],f:'🇨🇳',h:{'2027-01-01':'Año Nuevo'}},
+{n:'Hong Kong',tz:'Asia/Hong_Kong',s:[[9,30,12,0],[13,0,16,0]],f:'🇭🇰',h:{'2026-12-25':'Navidad','2027-01-01':'Año Nuevo'},e:{'2026-12-24':[12,0],'2026-12-31':[12,0]}},
+{n:'Londres',tz:'Europe/London',s:[[8,0,16,30]],f:'🇬🇧',h:{'2026-12-25':'Navidad','2026-12-28':'Feriado de Navidad','2027-01-01':'Año Nuevo'},e:{'2026-12-24':[12,30],'2026-12-31':[12,30]}},
+{n:'Nueva York',tz:'America/New_York',s:[[9,30,16,0]],f:'🇺🇸',h:{'2026-11-26':'Acción de Gracias','2026-12-25':'Navidad','2027-01-01':'Año Nuevo','2027-01-18':'Martin Luther King'},e:{'2026-11-27':[13,0],'2026-12-24':[13,0]}}];
 function parts(tz,d){const p={};new Intl.DateTimeFormat('en-US',{timeZone:tz,hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).forEach(x=>p[x.type]=x.value);p.h=(+p.hour)%24;p.m=+p.minute;return p}
 function fmtCL(d){return new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit',hour12:false}).format(d)}
 function atLocal(tz,y,mo,da,h,mi){/* instante UTC para una hora local de la plaza */let g=new Date(Date.UTC(y,mo-1,da,h,mi));for(let i=0;i<2;i++){const p=parts(tz,g);const dif=(Date.UTC(y,mo-1,da,h,mi)-Date.UTC(+p.year,+p.month-1,+p.day,p.h,p.m));g=new Date(g.getTime()+dif)}return g}
 function dur(r){return Math.floor(r/60)+' h '+String(r%60).padStart(2,'0')+' min'}
-function hrs(){const now=new Date();let out='';MK.forEach(m=>{const p=parts(m.tz,now),wd=!['Sat','Sun'].includes(p.weekday),mins=p.h*60+p.m,S=m.s.map(x=>[x[0]*60+x[1],x[2]*60+x[3]]),last=S.length-1;
-const idx=wd?S.findIndex(x=>mins>=x[0]&&mins<x[1]):-1;let state='off',lab='CERRADO',est='abre próximo día hábil';
-if(idx>=0){state='on';lab='ABIERTO';est=idx<last?'receso en '+dur(S[idx][1]-mins):'cierra en '+dur(S[idx][1]-mins)}
+function hrs(){const now=new Date();let out='';MK.forEach(m=>{const p=parts(m.tz,now),k=p.year+'-'+p.month+'-'+p.day,wk=!['Sat','Sun'].includes(p.weekday),hol=(m.h||{})[k],wd=wk&&!hol,mins=p.h*60+p.m;
+const base=m.s.map(x=>[x[0]*60+x[1],x[2]*60+x[3]]);let S=base,early=false;const ec=(m.e||{})[k];
+if(ec&&wd){const lim=ec[0]*60+ec[1];S=base.filter(x=>x[0]<lim).map(x=>[x[0],Math.min(x[1],lim)]);early=true}
+const last=S.length-1,idx=wd?S.findIndex(x=>mins>=x[0]&&mins<x[1]):-1;let state='off',lab='CERRADO',est='abre próximo día hábil';
+if(hol){lab='FERIADO';est=hol}
+else if(idx>=0){state='on';lab='ABIERTO';est=idx<last?'receso en '+dur(S[idx][1]-mins):'cierra en '+dur(S[idx][1]-mins)}
 else if(wd&&mins<S[0][0]){est='abre en '+dur(S[0][0]-mins)}
 else if(wd&&mins<S[last][0]){state='lunch';lab='RECESO';est='reabre en '+dur(S.find(x=>x[0]>mins)[0]-mins)}
-const op=atLocal(m.tz,+p.year,+p.month,+p.day,m.s[0][0],m.s[0][1]),cl=atLocal(m.tz,+p.year,+p.month,+p.day,m.s[last][2],m.s[last][3]);
-out+='<div class="mkt"><span class="fl">'+m.f+'</span><div><b>'+m.n+'</b> <span class="pill '+state+'">'+lab+'</span><div class="st2">'+est+'</div><small>Allá '+String(p.h).padStart(2,'0')+':'+String(p.m).padStart(2,'0')+' · En Chile '+fmtCL(op)+'–'+fmtCL(cl)+'</small></div></div>'});
+const toD=mm=>atLocal(m.tz,+p.year,+p.month,+p.day,Math.floor(mm/60),mm%60),op=toD(S[0][0]),cl=toD(S[last][1]);
+const eh=early&&idx>=0?' <span class="pill early">CIERRE ANTICIPADO</span>':'';
+out+='<div class="mkt"><span class="fl">'+m.f+'</span><div><b>'+m.n+'</b> <span class="pill '+state+'">'+lab+'</span>'+eh+'<div class="st2">'+est+'</div><small>Allá '+String(p.h).padStart(2,'0')+':'+String(p.m).padStart(2,'0')+' · En Chile '+fmtCL(op)+'–'+fmtCL(cl)+'</small></div></div>'});
 document.getElementById('hrs').innerHTML=out}
 hrs();setInterval(hrs,30000);
 /* Instalación como app */
@@ -171,4 +189,29 @@ inst.onclick=async()=>{if(dp){dp.prompt();await dp.userChoice;dp=null;inst.hidde
 addEventListener('appinstalled',()=>{inst.hidden=true;tip.hidden=true});
 if(!standalone&&/iphone|ipad|ipod/i.test(navigator.userAgent))tip.hidden=false;
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+/* Datos del servidor */
+const GEN=__GEN__*1000,EV=__EVJSON__;
+function ago2(ms){const m=Math.round(ms/60000);return m<60?m+' min':m<1440?Math.floor(m/60)+' h '+m%60+' min':Math.floor(m/1440)+' d'}
+function nextEv(){const now=Date.now(),n=EV.find(e=>e.ts*1000>now),el=document.getElementById('nextev');
+if(!n){el.hidden=true;return}
+const d=new Date(n.ts*1000),hh=new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit',hour12:false}).format(d),
+dd=new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',weekday:'long',day:'numeric',month:'short'}).format(d);
+el.firstChild.innerHTML='⏱️ <b>Próximo evento de alto impacto:</b> '+n.f+' '+n.t+'<br><span style="color:var(--mut)">en '+ago2(n.ts*1000-now)+' · '+dd+' '+hh+' (Chile)</span>';el.hidden=false}
+function stale(){const age=Date.now()-GEN,el=document.getElementById('stale');
+if(age>45*60000){el.firstChild.innerHTML='⏳ Estos datos tienen <b>'+ago2(age)+'</b>. El servidor actualiza varias veces al día; toca 🔄 para recargar por si hay una versión más nueva.';el.hidden=false}else el.hidden=true}
+nextEv();stale();setInterval(()=>{nextEv();stale()},60000);
+document.getElementById('rf').onclick=e=>{e.currentTarget.classList.add('spin');navigator.serviceWorker&&caches?caches.keys().then(k=>Promise.all(k.map(x=>caches.delete(x)))).finally(()=>location.reload()):location.reload()};
+/* Marcar noticias NUEVAS desde tu última visita */
+try{const now=Date.now(),last=+localStorage.lv||0;let base=+localStorage.lvb||0;
+if(!last||now-last>20*60000){base=last;localStorage.lvb=base}localStorage.lv=now;
+if(base)document.querySelectorAll('a.n[data-ts]').forEach(a=>{if(+a.dataset.ts*1000>base)a.classList.add('fresh')})}catch(e){}
+/* Filtro: buscar y solo destacadas */
+document.querySelectorAll('.sec').forEach(sec=>{if(sec.id==='agenda'||!sec.querySelector('a.n'))return;
+const box=document.createElement('div');box.className='flt';
+box.innerHTML='<input class="srch" type="search" placeholder="🔍 Buscar en esta sección" aria-label="Buscar"><button type="button">🔥 Destacadas</button>';
+sec.insertBefore(box,sec.firstChild);const inp=box.firstChild,btn=box.lastChild;
+const run=()=>{const q=inp.value.trim().toLowerCase(),only=btn.classList.contains('on');
+sec.querySelectorAll('a.n').forEach(a=>{const ok=(!q||a.innerText.toLowerCase().includes(q))&&(!only||a.classList.contains('hot'));a.style.display=ok?'':'none'})};
+inp.oninput=run;btn.onclick=()=>{btn.classList.toggle('on');run()}});
+
 </script></body></html>

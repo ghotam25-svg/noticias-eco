@@ -482,6 +482,14 @@ def render_agenda(ag):
     return '<section class="sec on" id="agenda">' + "".join(parts) + "</section>", alert_html
 
 
+def ev_json(ag):
+    """Eventos de alto impacto futuros (para la cuenta regresiva del navegador)."""
+    now = time.time()
+    ev = [{"ts": int(e["ts"]), "t": e["title_es"], "f": e["flag"]} for e in ag.get("events", [])
+          if e["impact"] == "High" and e["ts"] > now][:12]
+    return json.dumps(ev, ensure_ascii=False).replace("</", "<\\/")
+
+
 def render(items, agenda):
     body = []
     counts = {}
@@ -500,7 +508,7 @@ def render(items, agenda):
             tag += {"mejora": '<span class="tag bu">⬆️ Mejora de analista</span>',
                     "rebaja": '<span class="tag be">⬇️ Rebaja de analista</span>'}.get(i.get("action", ""), "")
             cards.append(
-                f'<a class="n{" hot" if i.get("hot") else ""}" href="{e(i["link"])}" target="_blank" rel="noopener">'
+                f'<a class="n{" hot" if i.get("hot") else ""}" href="{e(i["link"])}" data-ts="{int(i["ts"])}" target="_blank" rel="noopener">'
                 f'<div class="t">{e(i["title_es"])}</div>{summ}'
                 f'<div class="m"><span class="src">{e(i["source"])}</span><span>{ago(i["ts"])}</span>{tag}</div></a>'
             )
@@ -510,7 +518,7 @@ def render(items, agenda):
     return (PAGE.replace("__UPDATED__", now).replace("__BODY__", "\n".join(body))
             .replace("__NC__", str(counts["chile"])).replace("__NM__", str(counts["mundo"]))
             .replace("__NR__", str(counts["resultados"])).replace("__NI__", str(counts["ia"])).replace("__NT__", str(counts["traders"]))
-            .replace("__ALERT__", alert_html).replace("__MKT__", render_markets(agenda.get("markets", []))))
+            .replace("__GEN__", str(int(time.time()))).replace("__EVJSON__", ev_json(agenda)).replace("__ALERT__", alert_html).replace("__MKT__", render_markets(agenda.get("markets", []))))
 
 
 def run_once():
