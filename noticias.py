@@ -26,6 +26,7 @@ import feedparser
 import requests
 
 import agenda
+import resumen
 import traders
 from deep_translator import GoogleTranslator, MyMemoryTranslator
 
@@ -433,8 +434,8 @@ def render_markets(mk):
     for q in mk:
         up = q["pct"] >= 0
         price = f'{q["price"]:,.{q["dec"]}f}'.replace(",", "X").replace(".", ",").replace("X", ".")
-        chips.append(f'<span class="i"><small>{html.escape(q["name"])}</small><b>{price}</b>'
-                     f'<span class="{"up2" if up else "dn"}">{"▲" if up else "▼"} {abs(q["pct"]):.2f}%</span></span>')
+        chips.append(f'<span class="i" data-sym="{html.escape(q["symbol"])}" data-dec="{q["dec"]}"><small>{html.escape(q["name"])}</small><b>{price}</b>'
+                     f'<span class="{"up2" if up else "dn"}">{"▲" if up else "▼"} {str(f"{abs(q["pct"]):.2f}").replace(".", ",")}%</span></span>')
     row = "".join(chips)
     return f'<div class="tk" aria-label="Indicadores de mercado"><div class="tk-in">{row}{row}</div></div>'
 
@@ -452,6 +453,7 @@ def render_agenda(ag):
         mins = (ev["ts"] - time.time()) / 60
         if ev["impact"] == "High" and 0 < mins <= 24 * 60:
             alerts.append(f'🔴 <b>{e(ev["flag"])} {e(ev["title_es"])}</b> · {"hoy" if d.date() == today else "mañana"} {d:%H:%M}')
+    parts.append(resumen.render(ag))
     parts.append("<h2>📅 Calendario económico (hora de Chile)</h2>")
     for day in sorted(days):
         parts.append(f"<h2>{fecha_es(day)}</h2>")
@@ -478,10 +480,20 @@ def render_agenda(ag):
             cap = f'US$ {q["cap"] / 1e9:,.0f} mil millones'.replace(",", ".") if q["cap"] else ""
             eps = f' · BPA esperado {e(q["eps"])}' if q.get("eps") else ""
             star = "⭐ " if q.get("watch") else ""
-            hora = f' · 🕒 ~{q["window"]} hora Chile' if q.get("window") else ""
+            if q.get("hora"):
+                hora = f' · 🕒 ~{q["hora"]} hora Chile (ref.)'
+            else:
+                hora = f' · 🕒 ~{q["window"]} hora Chile' if q.get("window") else ""
+            extra = []
+            if q.get("implied"):
+                extra.append(f'🎯 Opciones esperan ~±{str(q["implied"]).replace(".", ",")}%')
+            for k_, lab_ in (("pre", "Pre-market"), ("post", "Post-market")):
+                if q.get(k_) is not None:
+                    extra.append(f'{lab_} {str(f"{q[k_]:+.2f}").replace(".", ",")}%')
+            extra = f'<div class="x">{" · ".join(extra)}</div>' if extra else ""
             idx = f'<div class="x">📈 Podría mover: <b>{e(" · ".join(q["indices"]))}</b></div>' if q.get("indices") else ""
             parts.append(f'<div class="ev md"><div class="h">{e(q["symbol"])}</div><div><div class="t">{star}{e(q["name"])}</div>'
-                         f'<div class="x">{e(q["session"])}{hora}{eps} · {cap}</div>{idx}</div></div>')
+                         f'<div class="x">{e(q["session"])}{hora}{eps} · {cap}</div>{extra}{idx}</div></div>')
         if day - today <= timedelta(days=1):
             names = ", ".join(q["symbol"] for q in by[ds] if q.get("watch"))[:80]
             if names:
@@ -528,7 +540,7 @@ def render(items, agenda):
     return (PAGE.replace("__UPDATED__", now).replace("__BODY__", "\n".join(body))
             .replace("__NC__", str(counts["chile"])).replace("__NM__", str(counts["mundo"]))
             .replace("__NR__", str(counts["resultados"])).replace("__NI__", str(counts["ia"])).replace("__NT__", str(counts["traders"]))
-            .replace("__GEN__", str(int(time.time()))).replace("__EVJSON__", ev_json(agenda)).replace("__ALERT__", alert_html).replace("__MKT__", render_markets(agenda.get("markets", []))))
+            .replace("__QURL__", os.environ.get("QUOTES_URL", "")).replace("__GEN__", str(int(time.time()))).replace("__EVJSON__", ev_json(agenda)).replace("__ALERT__", alert_html).replace("__MKT__", render_markets(agenda.get("markets", []))))
 
 
 def run_once():

@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
+import yq
+
 try:
     from zoneinfo import ZoneInfo
     TZ = ZoneInfo("America/Santiago")
@@ -152,40 +154,91 @@ def earnings(days=10):
     return out
 
 
+# (nombre, símbolo Yahoo, decimales, grupo)  grupo: fut=futuros EE.UU., asia, eu, riesgo, mat=materias primas/cripto
 MARKETS = [
-    ("US100 · Nasdaq 100", "NQ=F", 1), ("S&P 500", "^GSPC", 1), ("Oro", "GC=F", 1), ("Bitcoin", "BTC-USD", 0),
-    ("Dólar/CLP", "USDCLP=X", 1), ("Cobre", "HG=F", 2), ("Petróleo WTI", "CL=F", 2), ("VIX", "^VIX", 2),
-    ("Índice dólar", "DX-Y.NYB", 2), ("Nikkei 225", "^N225", 0), ("Hang Seng", "^HSI", 0),
-    ("Shanghái", "000001.SS", 0),
+    ("US100 · Futuro", "NQ=F", 1, "fut"), ("US100 · Índice", "^NDX", 1, "fut"),
+    ("S&P 500 · Futuro", "ES=F", 1, "fut"), ("Dow · Futuro", "YM=F", 0, "fut"),
+    ("Oro", "GC=F", 1, "mat"), ("Bitcoin", "BTC-USD", 0, "mat"), ("Petróleo WTI", "CL=F", 2, "mat"),
+    ("Cobre", "HG=F", 2, "mat"), ("VIX", "^VIX", 2, "riesgo"), ("Bono 10 años EE.UU.", "^TNX", 3, "riesgo"),
+    ("Índice dólar", "DX-Y.NYB", 2, "riesgo"), ("Dólar/CLP", "USDCLP=X", 1, "riesgo"),
+    ("Nikkei 225", "^N225", 0, "asia"), ("Hang Seng", "^HSI", 0, "asia"), ("Shanghái", "000001.SS", 0, "asia"),
+    ("FTSE 100", "^FTSE", 0, "eu"), ("DAX", "^GDAXI", 0, "eu"),
 ]
 
 
-def _quote(m):
-    name, sym, dec = m
+def _quote_chart(m):
+    """Respaldo si Yahoo no entrega la cotización completa: usa el gráfico diario."""
+    name, sym, dec, grp = m
     try:
         r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}",
                          params={"interval": "1d", "range": "5d"}, headers=H, timeout=15)
         res = r.json()["chart"]["result"][0]
         price = res["meta"]["regularMarketPrice"]
         closes = [c for c in res["indicators"]["quote"][0]["close"] if c is not None]
-        # cierre anterior: el penúltimo cierre diario (el último es la sesión en curso)
         prev = closes[-2] if len(closes) >= 2 else res["meta"].get("chartPreviousClose")
         pct = (price - prev) / prev * 100 if prev else 0.0
-        return {"name": name, "symbol": sym, "price": price, "pct": pct, "dec": dec}
+        return {"name": name, "symbol": sym, "price": price, "pct": pct, "dec": dec, "grp": grp, "state": ""}
     except Exception as ex:
         print(f"  ! {sym}: {ex}", file=sys.stderr)
         return None
 
 
 def markets():
-    with ThreadPoolExecutor(5) as ex:
-        out = [q for q in ex.map(_quote, MARKETS) if q]
+    qs = yq.quotes([m[1] for m in MARKETS])
+    out = []
+    for m in MARKETS:
+        name, sym, dec, grp = m
+        x = qs.get(sym)
+        if x and x.get("regularMarketPrice") is not None:
+            out.append({"name": name, "symbol": sym, "price": x["regularMarketPrice"],
+                        "pct": x.get("regularMarketChangePercent") or 0.0, "dec": dec, "grp": grp,
+                        "state": x.get("marketState", "")})
+        else:
+            q = _quote_chart(m)
+            if q:
+                out.append(q)
     print(f"  indicadores: {len(out)}/{len(MARKETS)}")
     return out
 
 
+def enrich_earnings(earn, days=5):
+    """Hora referencial (Yahoo), pre/post-market y movimiento esperado por opciones para los reportes cercanos."""
+    today = datetime.now(timezone.utc).date()
+    targets = [r for r in earn if 0 <= (datetime.fromisoformat(r["date"]).date() - today).days <= days]
+    targets = sorted(targets, key=lambda r: -r["cap"])[:16]
+    if not targets:
+        return
+    qs = yq.quotes([r["symbol"] for r in targets])
+    for r in targets:
+        x = qs.get(r["symbol"]) or {}
+        ts = x.get("earningsTimestamp")
+        if ts and not x.get("isEarningsDateEstimate"):
+            d = datetime.fromtimestamp(ts, timezone.utc).astimezone(NY).date().isoformat() if NY else None
+            if d == r["date"]:
+                r["ts"] = ts
+                r["hora"] = datetime.fromtimestamp(ts, TZ).strftime("%H:%M")
+        for k_src, k_dst in (("preMarketChangePercent", "pre"), ("postMarketChangePercent", "post")):
+            if x.get(k_src) is not None:
+                r[k_dst] = round(x[k_src], 2)
+        if x.get("regularMarketPrice") is not None:
+            r["price"] = x["regularMarketPrice"]
+
+    def imp(r):
+        day_ts = datetime.fromisoformat(r["date"]).replace(tzinfo=timezone.utc).timestamp()
+        r["implied"] = yq.implied_move(r["symbol"], day_ts)
+    with ThreadPoolExecutor(3) as ex:
+        list(ex.map(imp, targets))
+    print(f"  resultados enriquecidos: {len(targets)} (hora {sum(1 for r in targets if 'hora' in r)}, "
+          f"opciones {sum(1 for r in targets if r.get('implied'))})")
+
+
 def build(translate_batch):
-    return {"events": macro_events(translate_batch), "earnings": earnings(), "markets": markets()}
+    earn = earnings()
+    try:
+        enrich_earnings(earn)
+    except Exception as ex:
+        print("  ! enriquecer resultados:", ex, file=sys.stderr)
+    return {"events": macro_events(translate_batch), "earnings": earn, "markets": markets()}
 
 
 def notify(agenda, already):

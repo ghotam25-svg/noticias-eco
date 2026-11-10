@@ -128,11 +128,21 @@ nav button em{position:absolute;top:2px;right:calc(50% - 22px);font-style:normal
 .flt button.on{background:color-mix(in srgb,var(--dn) 14%,var(--card));color:var(--dn);border-color:color-mix(in srgb,var(--dn) 45%,var(--bd))}
 a.n.fresh::after{content:"NUEVO";position:absolute;top:12px;right:14px;font-size:9px;font-weight:800;letter-spacing:.06em;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:999px;padding:2px 7px}
 .pill.early{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.rsm{background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:14px 16px;margin-bottom:12px;box-shadow:var(--sh)}
+.rr{margin-top:10px}.rt{font-size:12px;font-weight:700;color:var(--mut);letter-spacing:.04em;margin-bottom:6px}
+.rcs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rc{display:grid;grid-template-columns:1fr auto;gap:0 6px;align-items:baseline;background:var(--card2);border:1px solid var(--bd);border-radius:12px;padding:6px 10px;font-size:13px;font-variant-numeric:tabular-nums}
+.rc small{grid-column:1/-1;color:var(--mut);font-size:11px}
+.rsm .x{font-size:12px;color:var(--mut);font-weight:400}
+.rl{margin:0;padding-left:18px;font-size:13.5px}.rl li{margin:5px 0}.rl .x{color:var(--mut);font-size:12px}
+@keyframes fl{from{background:color-mix(in srgb,var(--ac) 35%,transparent)}to{background:transparent}}
+.flash{animation:fl .9s ease-out}
+.live.on i{background:var(--up)}.live .lv{color:var(--up);font-weight:700}
 @media(min-width:900px){body{font-size:16px}}
 </style></head><body>
 <header>
 <div class="hd"><img class="logo" src="icon-192.png" alt="" width="34" height="34">
-<div><h1>Trading News</h1><div class="live"><i></i>Actualizado __UPDATED__ · hora Chile</div></div>
+<div><h1>Trading News</h1><div class="live"><i></i><span id="lvt">Actualizado __UPDATED__ · hora Chile</span></div></div>
 <span class="sp"></span><button id="inst" hidden>📲 Instalar</button><button id="rf" aria-label="Recargar" title="Recargar">🔄</button></div>
 __MKT__
 </header>
@@ -189,6 +199,20 @@ inst.onclick=async()=>{if(dp){dp.prompt();await dp.userChoice;dp=null;inst.hidde
 addEventListener('appinstalled',()=>{inst.hidden=true;tip.hidden=true});
 if(!standalone&&/iphone|ipad|ipod/i.test(navigator.userAgent))tip.hidden=false;
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+/* Precios en vivo (si hay servicio configurado): actualiza la cinta y el resumen cada ~45 s */
+const QURL='__QURL__';
+const fmtN=(v,d)=>v.toLocaleString('es-CL',{minimumFractionDigits:d,maximumFractionDigits:d});
+async function live(){if(!QURL||document.hidden)return;
+try{const syms=[...new Set([...document.querySelectorAll('[data-sym]')].map(x=>x.dataset.sym))];if(!syms.length)return;
+const r=await fetch(QURL+'?s='+encodeURIComponent(syms.join(',')),{cache:'no-store'});if(!r.ok)return;const j=await r.json();
+(j.q||[]).forEach(q=>{if(q.p==null)return;document.querySelectorAll('[data-sym="'+q.s.replace(/"/g,'')+'"]').forEach(el=>{
+const d=+el.dataset.dec,b=el.querySelector('b'),pc=el.lastElementChild,old=b.textContent,nv=fmtN(q.p,d);
+if(old!==nv){b.textContent=nv;el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash')}
+if(q.c!=null){pc.className=q.c>=0?'up2':'dn';pc.textContent=(q.c>=0?'▲ ':'▼ ')+fmtN(Math.abs(q.c),2)+'%'}})});
+const t=new Date(),hh=new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(t);
+const lv=document.getElementById('lvt');lv.innerHTML='<span class="lv">En vivo</span> · precios '+hh;lv.parentElement.classList.add('on')}catch(e){}}
+if(QURL){live();setInterval(live,45000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)live()})}
+
 /* Datos del servidor */
 const GEN=__GEN__*1000,EV=__EVJSON__;
 function ago2(ms){const m=Math.round(ms/60000);return m<60?m+' min':m<1440?Math.floor(m/60)+' h '+m%60+' min':Math.floor(m/1440)+' d'}
